@@ -1,7 +1,6 @@
 package tfclient
 
 import (
-	"context"
 	"crypto/tls"
 	"fmt"
 	"io"
@@ -99,7 +98,7 @@ type Option struct {
 }
 
 // New spins up an un-configured provider server, whose lifecycle is managed by the client, so make sure to call the "Kill" method on exit.
-func New(ctx context.Context, opts Option) (*Client, error) {
+func New(opts Option) (*Client, error) {
 	// handshake is the HandshakeConfig used to configure clients and servers.
 	// Reference: https://github.com/hashicorp/terraform/blob/a9230c9e7582c353c224cf0f4832d472ce042c0d/internal/plugin/serve.go#L22
 	handshake := plugin.HandshakeConfig{

@@ -26,7 +26,7 @@ func main() {
 		Logger: logger,
 	}
 
-	client, err := tfclient.New(context.TODO(), opts)
+	client, err := tfclient.New(opts)
 
 	if err != nil {
 		log.Fatal(err)
