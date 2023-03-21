@@ -11,12 +11,13 @@ import (
 	"github.com/hashicorp/go-plugin"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov5"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
+	"github.com/magodo/terraform-client-go/tfclient/client"
 	"github.com/magodo/terraform-client-go/tfclient/tfprotov5/tf5client"
 	"github.com/magodo/terraform-client-go/tfclient/tfprotov6/tf6client"
 	"google.golang.org/grpc"
 )
 
-type Client struct {
+type RawClient struct {
 	pluginClient *plugin.Client
 
 	// Either one of below will be non nil
@@ -97,8 +98,29 @@ type Option struct {
 	GRPCDialOptions []grpc.DialOption
 }
 
-// New spins up an un-configured provider server, whose lifecycle is managed by the client, so make sure to call the "Kill" method on exit.
-func New(opts Option) (*Client, error) {
+// New creates a normalized client. It spins up an un-configured provider server, whose lifecycle is managed by the client, so make sure to call the "Kill" method on exit.
+func New(opts Option) (client.Interface, error) {
+	c, v, err := newRaw(opts)
+	if err != nil {
+		return nil, err
+	}
+	switch v {
+	case 5:
+		return tf5client.New(c.pluginClient, c.v5client)
+	case 6:
+		return tf6client.New(c.pluginClient, c.v6client)
+	default:
+		return nil, fmt.Errorf("unsupported protocol version %d", v)
+	}
+}
+
+// NewRaw creates a raw client. It spins up an un-configured provider server, whose lifecycle is managed by the client, so make sure to call the "Kill" method on exit.
+func NewRaw(opts Option) (*RawClient, error) {
+	c, _, err := newRaw(opts)
+	return c, err
+}
+
+func newRaw(opts Option) (*RawClient, int, error) {
 	// handshake is the HandshakeConfig used to configure clients and servers.
 	// Reference: https://github.com/hashicorp/terraform/blob/a9230c9e7582c353c224cf0f4832d472ce042c0d/internal/plugin/serve.go#L22
 	handshake := plugin.HandshakeConfig{
@@ -135,7 +157,7 @@ func New(opts Option) (*Client, error) {
 		GRPCDialOptions:  opts.GRPCDialOptions,
 	}
 
-	var client Client
+	var client RawClient
 
 	pclient := plugin.NewClient(config)
 
@@ -143,12 +165,12 @@ func New(opts Option) (*Client, error) {
 
 	rpcClient, err := pclient.Client()
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	raw, err := rpcClient.Dispense("provider")
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	protoVer := pclient.NegotiatedVersion()
@@ -156,23 +178,23 @@ func New(opts Option) (*Client, error) {
 	case 5:
 		p := raw.(tfprotov5.ProviderServer)
 		client.v5client = p
-		return &client, nil
+		return &client, 5, nil
 	case 6:
 		p := raw.(tfprotov6.ProviderServer)
 		client.v6client = p
-		return &client, nil
+		return &client, 6, nil
 	default:
-		return nil, fmt.Errorf("unsupported protocol version %d", protoVer)
+		return nil, 0, fmt.Errorf("unsupported protocol version %d", protoVer)
 	}
 }
 
 // AsV5Client returns the v5 client if the linked provider is running in protocol v5, otherwise return nil
-func (c *Client) AsV5Client() tfprotov5.ProviderServer {
+func (c *RawClient) AsV5Client() tfprotov5.ProviderServer {
 	return c.v5client
 }
 
 // AsV6Client returns the v6 client if the linked provider is running in protocol v6, otherwise return nil
-func (c *Client) AsV6Client() tfprotov6.ProviderServer {
+func (c *RawClient) AsV6Client() tfprotov6.ProviderServer {
 	return c.v6client
 }
 
@@ -182,6 +204,6 @@ func (c *Client) AsV6Client() tfprotov6.ProviderServer {
 // This method blocks until the process successfully exits.
 //
 // This method can safely be called multiple times.
-func (c *Client) Kill() {
+func (c *RawClient) Kill() {
 	c.pluginClient.Kill()
 }
