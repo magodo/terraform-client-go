@@ -1,4 +1,4 @@
-// This is derived from github.com/hashicorp/terraform/internal/plugin5/grpc_provider.go (15ecdb66c84cd8202b0ae3d34c44cb4bbece5444)
+// This is derived from github.com/hashicorp/terraform/internal/plugin/grpc_provider.go (15ecdb66c84cd8202b0ae3d34c44cb4bbece5444)
 
 package tf5client
 

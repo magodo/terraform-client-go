@@ -31,3 +31,5 @@ There are a lot of code duplication&adoption from different sources, for a reaso
     - The schema implied type based on hcldec
     - The type conversion between terraform core types and protobuf generated types is duplicated, but adopted for conversion between `terraform-json` types and `terraform-plugin-go` types.
     - The client interface implementations for the two protocols
+
+There is a Terraform module (*tools/upstream-change-monitor*) being used to keep track of the upstream file changes.

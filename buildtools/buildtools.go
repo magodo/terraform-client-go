@@ -1,6 +1,6 @@
 //go:build tools
 
-package tools
+package buildtools
 
 import (
 	// Protocol Buffers compiler plugin for Go gRPC. This tool is versioned
