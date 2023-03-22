@@ -11,7 +11,7 @@ import (
 	"github.com/hashicorp/go-hclog"
 	"github.com/magodo/terraform-client-go/tfclient"
 	"github.com/magodo/terraform-client-go/tfclient/client"
-	"github.com/magodo/tfstate/terraform/jsonschema"
+	"github.com/magodo/terraform-client-go/tfclient/configschema"
 	ctyjson "github.com/zclconf/go-cty/cty/json"
 )
 
@@ -42,7 +42,7 @@ func main() {
 	schResp, diags := c.GetProviderSchema()
 	showDiags(diags)
 
-	config, err := ctyjson.Unmarshal([]byte(`{"features": []}`), jsonschema.SchemaBlockImpliedType(schResp.Provider.Block))
+	config, err := ctyjson.Unmarshal([]byte(`{"features": []}`), configschema.SchemaBlockImpliedType(schResp.Provider.Block))
 	if err != nil {
 		log.Fatal(err)
 	}

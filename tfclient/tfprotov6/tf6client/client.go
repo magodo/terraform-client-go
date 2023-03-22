@@ -12,8 +12,8 @@ import (
 	tfjson "github.com/hashicorp/terraform-json"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/magodo/terraform-client-go/tfclient/client"
+	"github.com/magodo/terraform-client-go/tfclient/configschema"
 	"github.com/magodo/terraform-client-go/tfclient/tfprotov6/convert"
-	"github.com/magodo/tfstate/terraform/jsonschema"
 	"github.com/zclconf/go-cty/cty"
 	ctyjson "github.com/zclconf/go-cty/cty/json"
 	"github.com/zclconf/go-cty/cty/msgpack"
@@ -84,7 +84,7 @@ func (c *Client) GetProviderSchema() (*client.GetProviderSchemaResponse, client.
 func (c *Client) ValidateProviderConfig(ctx context.Context, request client.ValidateProviderConfigRequest) (*client.ValidateProviderConfigResponse, client.Diagnostics) {
 	var diags client.Diagnostics
 
-	ty := jsonschema.SchemaBlockImpliedType(c.schemas.Provider.Block)
+	ty := configschema.SchemaBlockImpliedType(c.schemas.Provider.Block)
 
 	mp, err := msgpack.Marshal(request.Config, ty)
 	if err != nil {
@@ -128,7 +128,7 @@ func (c *Client) ValidateResourceConfig(ctx context.Context, request client.Vali
 		return nil, diags
 	}
 
-	mp, err := msgpack.Marshal(request.Config, jsonschema.SchemaBlockImpliedType(resourceSchema.Block))
+	mp, err := msgpack.Marshal(request.Config, configschema.SchemaBlockImpliedType(resourceSchema.Block))
 	if err != nil {
 		diags = append(diags, client.ErrorDiagnostics("msgpack marshal", err)...)
 		return nil, diags
@@ -161,7 +161,7 @@ func (c *Client) ValidateDataResourceConfig(ctx context.Context, request client.
 		return nil, diags
 	}
 
-	mp, err := msgpack.Marshal(request.Config, jsonschema.SchemaBlockImpliedType(datasourceSchema.Block))
+	mp, err := msgpack.Marshal(request.Config, configschema.SchemaBlockImpliedType(datasourceSchema.Block))
 	if err != nil {
 		diags = append(diags, client.ErrorDiagnostics("msgpack marshal", err)...)
 		return nil, diags
@@ -215,7 +215,7 @@ func (c *Client) UpgradeResourceState(ctx context.Context, request client.Upgrad
 		return nil, diags
 	}
 
-	ty := jsonschema.SchemaBlockImpliedType(resSchema.Block)
+	ty := configschema.SchemaBlockImpliedType(resSchema.Block)
 	state := cty.NullVal(ty)
 	if resp.UpgradedState != nil {
 		state, err = decodeDynamicValue(resp.UpgradedState, ty)
@@ -245,7 +245,7 @@ func (c *Client) ConfigureProvider(ctx context.Context, request client.Configure
 	schema := c.schemas
 	mp, err := msgpack.Marshal(
 		request.Config,
-		jsonschema.SchemaBlockImpliedType(schema.Provider.Block),
+		configschema.SchemaBlockImpliedType(schema.Provider.Block),
 	)
 	if err != nil {
 		diags := client.ErrorDiagnostics("msgpack marshal", err)
@@ -288,7 +288,7 @@ func (c *Client) ReadResource(ctx context.Context, request client.ReadResourceRe
 
 	metaSchema := schema.ProviderMeta
 
-	mp, err := msgpack.Marshal(request.PriorState, jsonschema.SchemaBlockImpliedType(resSchema.Block))
+	mp, err := msgpack.Marshal(request.PriorState, configschema.SchemaBlockImpliedType(resSchema.Block))
 	if err != nil {
 		diags = append(diags, client.ErrorDiagnostics("msgpack marshal", err)...)
 		return nil, diags
@@ -302,7 +302,7 @@ func (c *Client) ReadResource(ctx context.Context, request client.ReadResourceRe
 
 	// The second check here is not something from terraform's implementation, should be derived from the schema drift in tfjson module.
 	if metaSchema.Block != nil && len(metaSchema.Block.NestedBlocks)+len(metaSchema.Block.Attributes) != 0 {
-		metaMP, err := msgpack.Marshal(request.ProviderMeta, jsonschema.SchemaBlockImpliedType(metaSchema.Block))
+		metaMP, err := msgpack.Marshal(request.ProviderMeta, configschema.SchemaBlockImpliedType(metaSchema.Block))
 		if err != nil {
 			diags = append(diags, client.ErrorDiagnostics("msgpack marshal", err)...)
 			return nil, diags
@@ -322,7 +322,7 @@ func (c *Client) ReadResource(ctx context.Context, request client.ReadResourceRe
 		return nil, diags
 	}
 
-	state, err := decodeDynamicValue(resp.NewState, jsonschema.SchemaBlockImpliedType(resSchema.Block))
+	state, err := decodeDynamicValue(resp.NewState, configschema.SchemaBlockImpliedType(resSchema.Block))
 	if err != nil {
 		diags = append(diags, client.ErrorDiagnostics("decode dynamic value", err)...)
 		return nil, diags
@@ -357,19 +357,19 @@ func (c *Client) PlanResourceChange(ctx context.Context, request client.PlanReso
 		return &response, nil
 	}
 
-	priorMP, err := msgpack.Marshal(request.PriorState, jsonschema.SchemaBlockImpliedType(resSchema.Block))
+	priorMP, err := msgpack.Marshal(request.PriorState, configschema.SchemaBlockImpliedType(resSchema.Block))
 	if err != nil {
 		diags = append(diags, client.ErrorDiagnostics("msgpack marshal", err)...)
 		return nil, diags
 	}
 
-	configMP, err := msgpack.Marshal(request.Config, jsonschema.SchemaBlockImpliedType(resSchema.Block))
+	configMP, err := msgpack.Marshal(request.Config, configschema.SchemaBlockImpliedType(resSchema.Block))
 	if err != nil {
 		diags = append(diags, client.ErrorDiagnostics("msgpack marshal", err)...)
 		return nil, diags
 	}
 
-	propMP, err := msgpack.Marshal(request.ProposedNewState, jsonschema.SchemaBlockImpliedType(resSchema.Block))
+	propMP, err := msgpack.Marshal(request.ProposedNewState, configschema.SchemaBlockImpliedType(resSchema.Block))
 	if err != nil {
 		diags = append(diags, client.ErrorDiagnostics("msgpack marshal", err)...)
 		return nil, diags
@@ -385,7 +385,7 @@ func (c *Client) PlanResourceChange(ctx context.Context, request client.PlanReso
 
 	// The second check here is not something from terraform's implementation, should be derived from the schema drift in tfjson module.
 	if metaSchema.Block != nil && len(metaSchema.Block.NestedBlocks)+len(metaSchema.Block.Attributes) != 0 {
-		metaMP, err := msgpack.Marshal(request.ProviderMeta, jsonschema.SchemaBlockImpliedType(resSchema.Block))
+		metaMP, err := msgpack.Marshal(request.ProviderMeta, configschema.SchemaBlockImpliedType(resSchema.Block))
 		if err != nil {
 			diags = append(diags, client.ErrorDiagnostics("msgpack marshal", err)...)
 			return nil, diags
@@ -404,7 +404,7 @@ func (c *Client) PlanResourceChange(ctx context.Context, request client.PlanReso
 		return nil, diags
 	}
 
-	state, err := decodeDynamicValue(protoResp.PlannedState, jsonschema.SchemaBlockImpliedType(resSchema.Block))
+	state, err := decodeDynamicValue(protoResp.PlannedState, configschema.SchemaBlockImpliedType(resSchema.Block))
 	if err != nil {
 		diags = append(diags, client.ErrorDiagnostics("decode dynamic value", err)...)
 		return nil, diags
@@ -434,17 +434,17 @@ func (c *Client) ApplyResourceChange(ctx context.Context, request client.ApplyRe
 
 	metaSchema := schema.ProviderMeta
 
-	priorMP, err := msgpack.Marshal(request.PriorState, jsonschema.SchemaBlockImpliedType(resSchema.Block))
+	priorMP, err := msgpack.Marshal(request.PriorState, configschema.SchemaBlockImpliedType(resSchema.Block))
 	if err != nil {
 		diags = append(diags, client.ErrorDiagnostics("msgpack marshal", err)...)
 		return nil, diags
 	}
-	plannedMP, err := msgpack.Marshal(request.PlannedState, jsonschema.SchemaBlockImpliedType(resSchema.Block))
+	plannedMP, err := msgpack.Marshal(request.PlannedState, configschema.SchemaBlockImpliedType(resSchema.Block))
 	if err != nil {
 		diags = append(diags, client.ErrorDiagnostics("msgpack marshal", err)...)
 		return nil, diags
 	}
-	configMP, err := msgpack.Marshal(request.Config, jsonschema.SchemaBlockImpliedType(resSchema.Block))
+	configMP, err := msgpack.Marshal(request.Config, configschema.SchemaBlockImpliedType(resSchema.Block))
 	if err != nil {
 		diags = append(diags, client.ErrorDiagnostics("msgpack marshal", err)...)
 		return nil, diags
@@ -460,7 +460,7 @@ func (c *Client) ApplyResourceChange(ctx context.Context, request client.ApplyRe
 
 	// The second check here is not something from terraform's implementation, should be derived from the schema drift in tfjson module.
 	if metaSchema.Block != nil && len(metaSchema.Block.NestedBlocks)+len(metaSchema.Block.Attributes) != 0 {
-		metaMP, err := msgpack.Marshal(request.ProviderMeta, jsonschema.SchemaBlockImpliedType(metaSchema.Block))
+		metaMP, err := msgpack.Marshal(request.ProviderMeta, configschema.SchemaBlockImpliedType(metaSchema.Block))
 		if err != nil {
 			diags = append(diags, client.ErrorDiagnostics("msgpack marshal", err)...)
 			return nil, diags
@@ -479,7 +479,7 @@ func (c *Client) ApplyResourceChange(ctx context.Context, request client.ApplyRe
 		return nil, diags
 	}
 
-	state, err := decodeDynamicValue(protoResp.NewState, jsonschema.SchemaBlockImpliedType(metaSchema.Block))
+	state, err := decodeDynamicValue(protoResp.NewState, configschema.SchemaBlockImpliedType(metaSchema.Block))
 	if err != nil {
 		diags = append(diags, client.ErrorDiagnostics("msgpack marshal", err)...)
 		return nil, diags
@@ -523,7 +523,7 @@ func (c *Client) ImportResourceState(ctx context.Context, request client.ImportR
 			continue
 		}
 
-		state, err := decodeDynamicValue(imported.State, jsonschema.SchemaBlockImpliedType(resSchema.Block))
+		state, err := decodeDynamicValue(imported.State, configschema.SchemaBlockImpliedType(resSchema.Block))
 		if err != nil {
 			diags = append(diags, client.ErrorDiagnostics("decode dynamic value", err)...)
 			return nil, diags
@@ -548,7 +548,7 @@ func (c *Client) ReadDataSource(ctx context.Context, request client.ReadDataSour
 
 	metaSchema := schema.ProviderMeta
 
-	mp, err := msgpack.Marshal(request.Config, jsonschema.SchemaBlockImpliedType(dsSchema.Block))
+	mp, err := msgpack.Marshal(request.Config, configschema.SchemaBlockImpliedType(dsSchema.Block))
 	if err != nil {
 		diags = append(diags, client.ErrorDiagnostics("msgpack marshal", err)...)
 		return nil, diags
@@ -561,7 +561,7 @@ func (c *Client) ReadDataSource(ctx context.Context, request client.ReadDataSour
 
 	// The second check here is not something from terraform's implementation, should be derived from the schema drift in tfjson module.
 	if metaSchema.Block != nil && len(metaSchema.Block.NestedBlocks)+len(metaSchema.Block.Attributes) != 0 {
-		metaMP, err := msgpack.Marshal(request.ProviderMeta, jsonschema.SchemaBlockImpliedType(metaSchema.Block))
+		metaMP, err := msgpack.Marshal(request.ProviderMeta, configschema.SchemaBlockImpliedType(metaSchema.Block))
 		if err != nil {
 			diags = append(diags, client.ErrorDiagnostics("msgpack marshal", err)...)
 			return nil, diags
@@ -581,7 +581,7 @@ func (c *Client) ReadDataSource(ctx context.Context, request client.ReadDataSour
 		return nil, diags
 	}
 
-	state, err := decodeDynamicValue(resp.State, jsonschema.SchemaBlockImpliedType(dsSchema.Block))
+	state, err := decodeDynamicValue(resp.State, configschema.SchemaBlockImpliedType(dsSchema.Block))
 	if err != nil {
 		diags = append(diags, client.ErrorDiagnostics("decode dynamic value", err)...)
 		return nil, diags

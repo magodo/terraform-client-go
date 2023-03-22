@@ -3,11 +3,14 @@ module github.com/magodo/terraform-client-go
 go 1.20
 
 require (
+	github.com/apparentlymart/go-dump v0.0.0-20180507223929-23540a00eaa3
+	github.com/davecgh/go-spew v1.1.1
+	github.com/google/go-cmp v0.5.9
 	github.com/hashicorp/go-hclog v1.2.1
 	github.com/hashicorp/go-plugin v1.4.8
+	github.com/hashicorp/hcl/v2 v2.11.1
 	github.com/hashicorp/terraform-json v0.16.0
 	github.com/hashicorp/terraform-plugin-go v0.14.3
-	github.com/magodo/tfstate v0.0.0-20220409052014-9b9568dda918
 	github.com/zclconf/go-cty v1.13.0
 	google.golang.org/grpc v1.53.0
 	google.golang.org/grpc/cmd/protoc-gen-go-grpc v1.2.0
@@ -20,7 +23,6 @@ require (
 	github.com/fatih/color v1.13.0 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/hashicorp/go-version v1.6.0 // indirect
-	github.com/hashicorp/hcl/v2 v2.11.1 // indirect
 	github.com/hashicorp/yamux v0.0.0-20180604194846-3520598351bb // indirect
 	github.com/mattn/go-colorable v0.1.12 // indirect
 	github.com/mattn/go-isatty v0.0.14 // indirect
