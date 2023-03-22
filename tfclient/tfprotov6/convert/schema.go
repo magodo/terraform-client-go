@@ -1,4 +1,4 @@
-// Duplicating the logic from: github.com/hashicorp/terraform/internal/plugin6/convert (15ecdb66c84cd8202b0ae3d34c44cb4bbece5444)
+// Duplicating the logic from: github.com/hashicorp/terraform/internal/plugin6/convert/schema.go (15ecdb66c84cd8202b0ae3d34c44cb4bbece5444)
 
 package convert
 
