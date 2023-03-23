@@ -12,6 +12,7 @@ import (
 	"github.com/magodo/terraform-client-go/tfclient"
 	"github.com/magodo/terraform-client-go/tfclient/client"
 	"github.com/magodo/terraform-client-go/tfclient/configschema"
+	"github.com/zclconf/go-cty/cty"
 	ctyjson "github.com/zclconf/go-cty/cty/json"
 )
 
@@ -63,10 +64,10 @@ func main() {
 	}
 	res := importResp.ImportedResources[0]
 	readResp, diags := c.ReadResource(ctx, client.ReadResourceRequest{
-		TypeName:   res.TypeName,
-		PriorState: res.State,
-		//Private:      res.Private,
-		//ProviderMeta: cty.Value{},
+		TypeName:     res.TypeName,
+		PriorState:   res.State,
+		Private:      res.Private,
+		ProviderMeta: cty.Value{},
 	})
 	showDiags(diags)
 	fmt.Println(readResp.NewState.GoString())

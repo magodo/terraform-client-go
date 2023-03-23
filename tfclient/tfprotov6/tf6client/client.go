@@ -39,7 +39,7 @@ type Client struct {
 	configuredMu sync.Mutex
 }
 
-func New(pluginClient *plugin.Client, grpcClient tfprotov6.ProviderServer) (client.Interface, error) {
+func New(pluginClient *plugin.Client, grpcClient tfprotov6.ProviderServer) (*Client, error) {
 	c := &Client{
 		pluginClient: pluginClient,
 		client:       grpcClient,

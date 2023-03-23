@@ -3,74 +3,9 @@
 package client
 
 import (
-	"context"
-
 	tfjson "github.com/hashicorp/terraform-json"
 	"github.com/zclconf/go-cty/cty"
 )
-
-// Interface represents the set of methods required for a complete resource
-// provider plugin.
-type Interface interface {
-	// GetProviderSchema returns the complete schema for the provider.
-	GetProviderSchema() (*GetProviderSchemaResponse, Diagnostics)
-
-	// ValidateProviderConfig allows the provider to validate the configuration.
-	// The ValidateProviderConfigResponse.PreparedConfig field is unused. The
-	// final configuration is not stored in the state, and any modifications
-	// that need to be made must be made during the Configure method call.
-	ValidateProviderConfig(context.Context, ValidateProviderConfigRequest) (*ValidateProviderConfigResponse, Diagnostics)
-
-	// ValidateResourceConfig allows the provider to validate the resource
-	// configuration values.
-	ValidateResourceConfig(context.Context, ValidateResourceConfigRequest) (*ValidateResourceConfigResponse, Diagnostics)
-
-	// ValidateDataResourceConfig allows the provider to validate the data source
-	// configuration values.
-	ValidateDataResourceConfig(context.Context, ValidateDataResourceConfigRequest) (*ValidateDataResourceConfigResponse, Diagnostics)
-
-	// UpgradeResourceState is called when the state loader encounters an
-	// instance state whose schema version is less than the one reported by the
-	// currently-used version of the corresponding provider, and the upgraded
-	// result is used for any further processing.
-	UpgradeResourceState(context.Context, UpgradeResourceStateRequest) (*UpgradeResourceStateResponse, Diagnostics)
-
-	// ConfigureProvider configures and initialized the provider.
-	ConfigureProvider(context.Context, ConfigureProviderRequest) (*ConfigureProviderResponse, Diagnostics)
-
-	// Stop is called when the provider should halt any in-flight actions.
-	//
-	// Stop should not block waiting for in-flight actions to complete. It
-	// should take any action it wants and return immediately acknowledging it
-	// has received the stop request. Terraform will not make any further API
-	// calls to the provider after Stop is called.
-	//
-	// The error returned, if non-nil, is assumed to mean that signaling the
-	// stop somehow failed and that the user should expect potentially waiting
-	// a longer period of time.
-	Stop(context.Context) error
-
-	// ReadResource refreshes a resource and returns its current state.
-	ReadResource(context.Context, ReadResourceRequest) (*ReadResourceResponse, Diagnostics)
-
-	// PlanResourceChange takes the current state and proposed state of a
-	// resource, and returns the planned final state.
-	PlanResourceChange(context.Context, PlanResourceChangeRequest) (*PlanResourceChangeResponse, Diagnostics)
-
-	// ApplyResourceChange takes the planned state for a resource, which may
-	// yet contain unknown computed values, and applies the changes returning
-	// the final state.
-	ApplyResourceChange(context.Context, ApplyResourceChangeRequest) (*ApplyResourceChangeResponse, Diagnostics)
-
-	// ImportResourceState requests that the given resource be imported.
-	ImportResourceState(context.Context, ImportResourceStateRequest) (*ImportResourceStateResponse, Diagnostics)
-
-	// ReadDataSource returns the data source's current state.
-	ReadDataSource(context.Context, ReadDataSourceRequest) (*ReadDataSourceResponse, Diagnostics)
-
-	// Close shuts down the plugin process if applicable.
-	Close()
-}
 
 type GetProviderSchemaResponse struct {
 	// Provider is the schema for the provider itself.

@@ -11,19 +11,10 @@ import (
 	"github.com/hashicorp/go-plugin"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov5"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
-	"github.com/magodo/terraform-client-go/tfclient/client"
 	"github.com/magodo/terraform-client-go/tfclient/tfprotov5/tf5client"
 	"github.com/magodo/terraform-client-go/tfclient/tfprotov6/tf6client"
 	"google.golang.org/grpc"
 )
-
-type RawClient struct {
-	pluginClient *plugin.Client
-
-	// Either one of below will be non nil
-	v5client tfprotov5.ProviderServer
-	v6client tfprotov6.ProviderServer
-}
 
 type Option struct {
 	// One of the following must be set, but not both.
@@ -99,7 +90,7 @@ type Option struct {
 }
 
 // New creates a normalized client. It spins up an un-configured provider server, whose lifecycle is managed by the client, so make sure to call the "Kill" method on exit.
-func New(opts Option) (client.Interface, error) {
+func New(opts Option) (Client, error) {
 	c, v, err := newRaw(opts)
 	if err != nil {
 		return nil, err
@@ -186,24 +177,4 @@ func newRaw(opts Option) (*RawClient, int, error) {
 	default:
 		return nil, 0, fmt.Errorf("unsupported protocol version %d", protoVer)
 	}
-}
-
-// AsV5Client returns the v5 client if the linked provider is running in protocol v5, otherwise return nil
-func (c *RawClient) AsV5Client() tfprotov5.ProviderServer {
-	return c.v5client
-}
-
-// AsV6Client returns the v6 client if the linked provider is running in protocol v6, otherwise return nil
-func (c *RawClient) AsV6Client() tfprotov6.ProviderServer {
-	return c.v6client
-}
-
-// Kill ends the executing subprocess (if it is running) and perform any cleanup
-// tasks necessary such as capturing any remaining logs and so on.
-//
-// This method blocks until the process successfully exits.
-//
-// This method can safely be called multiple times.
-func (c *RawClient) Kill() {
-	c.pluginClient.Kill()
 }
