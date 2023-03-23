@@ -11,9 +11,9 @@ import (
 	"github.com/hashicorp/go-plugin"
 	tfjson "github.com/hashicorp/terraform-json"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
-	"github.com/magodo/terraform-client-go/tfclient/client"
 	"github.com/magodo/terraform-client-go/tfclient/configschema"
 	"github.com/magodo/terraform-client-go/tfclient/tfprotov6/convert"
+	"github.com/magodo/terraform-client-go/tfclient/typ"
 	"github.com/zclconf/go-cty/cty"
 	ctyjson "github.com/zclconf/go-cty/cty/json"
 	"github.com/zclconf/go-cty/cty/msgpack"
@@ -33,7 +33,7 @@ type Client struct {
 
 	// schema stores the schema for this provider. This is used to properly
 	// serialize the state for requests.
-	schemas client.GetProviderSchemaResponse
+	schemas typ.GetProviderSchemaResponse
 
 	configured   bool
 	configuredMu sync.Mutex
@@ -53,12 +53,12 @@ func New(pluginClient *plugin.Client, grpcClient tfprotov6.ProviderServer) (*Cli
 		return nil, diags.Err()
 	}
 
-	schemas := client.GetProviderSchemaResponse{
+	schemas := typ.GetProviderSchemaResponse{
 		Provider:      convert.ProtoToProviderSchema(resp.Provider),
 		ProviderMeta:  convert.ProtoToProviderSchema(resp.ProviderMeta),
 		ResourceTypes: map[string]tfjson.Schema{},
 		DataSources:   map[string]tfjson.Schema{},
-		ServerCapabilities: client.ServerCapabilities{
+		ServerCapabilities: typ.ServerCapabilities{
 			PlanDestroy: false,
 		},
 	}
@@ -77,18 +77,18 @@ func New(pluginClient *plugin.Client, grpcClient tfprotov6.ProviderServer) (*Cli
 	return c, nil
 }
 
-func (c *Client) GetProviderSchema() (*client.GetProviderSchemaResponse, client.Diagnostics) {
+func (c *Client) GetProviderSchema() (*typ.GetProviderSchemaResponse, typ.Diagnostics) {
 	return &c.schemas, nil
 }
 
-func (c *Client) ValidateProviderConfig(ctx context.Context, request client.ValidateProviderConfigRequest) (*client.ValidateProviderConfigResponse, client.Diagnostics) {
-	var diags client.Diagnostics
+func (c *Client) ValidateProviderConfig(ctx context.Context, request typ.ValidateProviderConfigRequest) (*typ.ValidateProviderConfigResponse, typ.Diagnostics) {
+	var diags typ.Diagnostics
 
 	ty := configschema.SchemaBlockImpliedType(c.schemas.Provider.Block)
 
 	mp, err := msgpack.Marshal(request.Config, ty)
 	if err != nil {
-		diags = append(diags, client.ErrorDiagnostics("msgpack marshal", err)...)
+		diags = append(diags, typ.ErrorDiagnostics("msgpack marshal", err)...)
 		return nil, diags
 	}
 
@@ -98,7 +98,7 @@ func (c *Client) ValidateProviderConfig(ctx context.Context, request client.Vali
 		},
 	})
 	if err != nil {
-		diags = append(diags, client.RPCErrorDiagnostics(err)...)
+		diags = append(diags, typ.RPCErrorDiagnostics(err)...)
 		return nil, diags
 	}
 	respDiags := convert.DecodeDiagnostics(resp.Diagnostics)
@@ -109,28 +109,28 @@ func (c *Client) ValidateProviderConfig(ctx context.Context, request client.Vali
 
 	config, err := decodeDynamicValue(resp.PreparedConfig, ty)
 	if err != nil {
-		diags = append(diags, client.ErrorDiagnostics("decode dynamic value", err)...)
+		diags = append(diags, typ.ErrorDiagnostics("decode dynamic value", err)...)
 		return nil, diags
 	}
 
-	return &client.ValidateProviderConfigResponse{
+	return &typ.ValidateProviderConfigResponse{
 		PreparedConfig: config,
 	}, diags
 }
 
-func (c *Client) ValidateResourceConfig(ctx context.Context, request client.ValidateResourceConfigRequest) (*client.ValidateResourceConfigResponse, client.Diagnostics) {
-	var diags client.Diagnostics
+func (c *Client) ValidateResourceConfig(ctx context.Context, request typ.ValidateResourceConfigRequest) (*typ.ValidateResourceConfigResponse, typ.Diagnostics) {
+	var diags typ.Diagnostics
 
 	schema := c.schemas
 	resourceSchema, ok := schema.ResourceTypes[request.TypeName]
 	if !ok {
-		diags = append(diags, client.ErrorDiagnostics("no schema", fmt.Errorf("unknown resource type %q", request.TypeName))...)
+		diags = append(diags, typ.ErrorDiagnostics("no schema", fmt.Errorf("unknown resource type %q", request.TypeName))...)
 		return nil, diags
 	}
 
 	mp, err := msgpack.Marshal(request.Config, configschema.SchemaBlockImpliedType(resourceSchema.Block))
 	if err != nil {
-		diags = append(diags, client.ErrorDiagnostics("msgpack marshal", err)...)
+		diags = append(diags, typ.ErrorDiagnostics("msgpack marshal", err)...)
 		return nil, diags
 	}
 
@@ -139,7 +139,7 @@ func (c *Client) ValidateResourceConfig(ctx context.Context, request client.Vali
 		Config:   &tfprotov6.DynamicValue{MsgPack: mp},
 	})
 	if err != nil {
-		diags = append(diags, client.RPCErrorDiagnostics(err)...)
+		diags = append(diags, typ.RPCErrorDiagnostics(err)...)
 		return nil, diags
 	}
 	respDiags := convert.DecodeDiagnostics(resp.Diagnostics)
@@ -148,22 +148,22 @@ func (c *Client) ValidateResourceConfig(ctx context.Context, request client.Vali
 		return nil, diags
 	}
 
-	return &client.ValidateResourceConfigResponse{}, diags
+	return &typ.ValidateResourceConfigResponse{}, diags
 }
 
-func (c *Client) ValidateDataResourceConfig(ctx context.Context, request client.ValidateDataResourceConfigRequest) (*client.ValidateDataResourceConfigResponse, client.Diagnostics) {
-	var diags client.Diagnostics
+func (c *Client) ValidateDataResourceConfig(ctx context.Context, request typ.ValidateDataResourceConfigRequest) (*typ.ValidateDataResourceConfigResponse, typ.Diagnostics) {
+	var diags typ.Diagnostics
 
 	schema := c.schemas
 	datasourceSchema, ok := schema.DataSources[request.TypeName]
 	if !ok {
-		diags = append(diags, client.ErrorDiagnostics("no schema", fmt.Errorf("unknown data source type %q", request.TypeName))...)
+		diags = append(diags, typ.ErrorDiagnostics("no schema", fmt.Errorf("unknown data source type %q", request.TypeName))...)
 		return nil, diags
 	}
 
 	mp, err := msgpack.Marshal(request.Config, configschema.SchemaBlockImpliedType(datasourceSchema.Block))
 	if err != nil {
-		diags = append(diags, client.ErrorDiagnostics("msgpack marshal", err)...)
+		diags = append(diags, typ.ErrorDiagnostics("msgpack marshal", err)...)
 		return nil, diags
 	}
 
@@ -172,7 +172,7 @@ func (c *Client) ValidateDataResourceConfig(ctx context.Context, request client.
 		Config:   &tfprotov6.DynamicValue{MsgPack: mp},
 	})
 	if err != nil {
-		diags = append(diags, client.RPCErrorDiagnostics(err)...)
+		diags = append(diags, typ.RPCErrorDiagnostics(err)...)
 		return nil, diags
 	}
 	respDiags := convert.DecodeDiagnostics(resp.Diagnostics)
@@ -181,17 +181,17 @@ func (c *Client) ValidateDataResourceConfig(ctx context.Context, request client.
 		return nil, diags
 	}
 
-	return &client.ValidateDataResourceConfigResponse{}, diags
+	return &typ.ValidateDataResourceConfigResponse{}, diags
 }
 
-func (c *Client) UpgradeResourceState(ctx context.Context, request client.UpgradeResourceStateRequest) (*client.UpgradeResourceStateResponse, client.Diagnostics) {
-	var diags client.Diagnostics
+func (c *Client) UpgradeResourceState(ctx context.Context, request typ.UpgradeResourceStateRequest) (*typ.UpgradeResourceStateResponse, typ.Diagnostics) {
+	var diags typ.Diagnostics
 
 	schema := c.schemas
 
 	resSchema, ok := schema.ResourceTypes[request.TypeName]
 	if !ok {
-		diags = append(diags, client.ErrorDiagnostics("no schema", fmt.Errorf("unknown resource type %q", request.TypeName))...)
+		diags = append(diags, typ.ErrorDiagnostics("no schema", fmt.Errorf("unknown resource type %q", request.TypeName))...)
 		return nil, diags
 	}
 
@@ -206,7 +206,7 @@ func (c *Client) UpgradeResourceState(ctx context.Context, request client.Upgrad
 
 	resp, err := c.client.UpgradeResourceState(ctx, protoReq)
 	if err != nil {
-		diags = append(diags, client.RPCErrorDiagnostics(err)...)
+		diags = append(diags, typ.RPCErrorDiagnostics(err)...)
 		return nil, diags
 	}
 	respDiags := convert.DecodeDiagnostics(resp.Diagnostics)
@@ -220,22 +220,22 @@ func (c *Client) UpgradeResourceState(ctx context.Context, request client.Upgrad
 	if resp.UpgradedState != nil {
 		state, err = decodeDynamicValue(resp.UpgradedState, ty)
 		if err != nil {
-			diags = append(diags, client.ErrorDiagnostics("decode dynamic value", err)...)
+			diags = append(diags, typ.ErrorDiagnostics("decode dynamic value", err)...)
 			return nil, diags
 		}
 	}
-	return &client.UpgradeResourceStateResponse{
+	return &typ.UpgradeResourceStateResponse{
 		UpgradedState: state,
 	}, diags
 }
 
-func (c *Client) ConfigureProvider(ctx context.Context, request client.ConfigureProviderRequest) (*client.ConfigureProviderResponse, client.Diagnostics) {
+func (c *Client) ConfigureProvider(ctx context.Context, request typ.ConfigureProviderRequest) (*typ.ConfigureProviderResponse, typ.Diagnostics) {
 	c.configuredMu.Lock()
 	defer c.configuredMu.Unlock()
 	if c.configured {
-		return nil, client.Diagnostics{
+		return nil, typ.Diagnostics{
 			{
-				Severity: client.Error,
+				Severity: typ.Error,
 				Summary:  "Provider already configured",
 				Detail:   "This operation requires an unconfigured provider, but this provider was already configured.",
 			},
@@ -248,7 +248,7 @@ func (c *Client) ConfigureProvider(ctx context.Context, request client.Configure
 		configschema.SchemaBlockImpliedType(schema.Provider.Block),
 	)
 	if err != nil {
-		diags := client.ErrorDiagnostics("msgpack marshal", err)
+		diags := typ.ErrorDiagnostics("msgpack marshal", err)
 		return nil, diags
 	}
 	if _, err := c.client.ConfigureProvider(ctx, &tfprotov6.ConfigureProviderRequest{
@@ -257,11 +257,11 @@ func (c *Client) ConfigureProvider(ctx context.Context, request client.Configure
 			MsgPack: mp,
 		},
 	}); err != nil {
-		diags := client.RPCErrorDiagnostics(err)
+		diags := typ.RPCErrorDiagnostics(err)
 		return nil, diags
 	}
 	c.configured = true
-	return &client.ConfigureProviderResponse{}, nil
+	return &typ.ConfigureProviderResponse{}, nil
 }
 
 func (c *Client) Stop(ctx context.Context) error {
@@ -276,13 +276,13 @@ func (c *Client) Stop(ctx context.Context) error {
 	return nil
 }
 
-func (c *Client) ReadResource(ctx context.Context, request client.ReadResourceRequest) (*client.ReadResourceResponse, client.Diagnostics) {
-	var diags client.Diagnostics
+func (c *Client) ReadResource(ctx context.Context, request typ.ReadResourceRequest) (*typ.ReadResourceResponse, typ.Diagnostics) {
+	var diags typ.Diagnostics
 	schema := c.schemas
 
 	resSchema, ok := schema.ResourceTypes[request.TypeName]
 	if !ok {
-		diags = append(diags, client.ErrorDiagnostics("no schema", fmt.Errorf("unknown resource type %q", request.TypeName))...)
+		diags = append(diags, typ.ErrorDiagnostics("no schema", fmt.Errorf("unknown resource type %q", request.TypeName))...)
 		return nil, diags
 	}
 
@@ -290,7 +290,7 @@ func (c *Client) ReadResource(ctx context.Context, request client.ReadResourceRe
 
 	mp, err := msgpack.Marshal(request.PriorState, configschema.SchemaBlockImpliedType(resSchema.Block))
 	if err != nil {
-		diags = append(diags, client.ErrorDiagnostics("msgpack marshal", err)...)
+		diags = append(diags, typ.ErrorDiagnostics("msgpack marshal", err)...)
 		return nil, diags
 	}
 
@@ -304,7 +304,7 @@ func (c *Client) ReadResource(ctx context.Context, request client.ReadResourceRe
 	if metaSchema.Block != nil && len(metaSchema.Block.NestedBlocks)+len(metaSchema.Block.Attributes) != 0 {
 		metaMP, err := msgpack.Marshal(request.ProviderMeta, configschema.SchemaBlockImpliedType(metaSchema.Block))
 		if err != nil {
-			diags = append(diags, client.ErrorDiagnostics("msgpack marshal", err)...)
+			diags = append(diags, typ.ErrorDiagnostics("msgpack marshal", err)...)
 			return nil, diags
 		}
 		protoReq.ProviderMeta = &tfprotov6.DynamicValue{MsgPack: metaMP}
@@ -312,7 +312,7 @@ func (c *Client) ReadResource(ctx context.Context, request client.ReadResourceRe
 
 	resp, err := c.client.ReadResource(ctx, protoReq)
 	if err != nil {
-		diags = append(diags, client.RPCErrorDiagnostics(err)...)
+		diags = append(diags, typ.RPCErrorDiagnostics(err)...)
 		return nil, diags
 	}
 
@@ -324,30 +324,30 @@ func (c *Client) ReadResource(ctx context.Context, request client.ReadResourceRe
 
 	state, err := decodeDynamicValue(resp.NewState, configschema.SchemaBlockImpliedType(resSchema.Block))
 	if err != nil {
-		diags = append(diags, client.ErrorDiagnostics("decode dynamic value", err)...)
+		diags = append(diags, typ.ErrorDiagnostics("decode dynamic value", err)...)
 		return nil, diags
 	}
 
-	return &client.ReadResourceResponse{
+	return &typ.ReadResourceResponse{
 		NewState: state,
 		Private:  resp.Private,
 	}, diags
 }
 
-func (c *Client) PlanResourceChange(ctx context.Context, request client.PlanResourceChangeRequest) (*client.PlanResourceChangeResponse, client.Diagnostics) {
-	var diags client.Diagnostics
+func (c *Client) PlanResourceChange(ctx context.Context, request typ.PlanResourceChangeRequest) (*typ.PlanResourceChangeResponse, typ.Diagnostics) {
+	var diags typ.Diagnostics
 	schema := c.schemas
 
 	resSchema, ok := schema.ResourceTypes[request.TypeName]
 	if !ok {
-		diags = append(diags, client.ErrorDiagnostics("no schema", fmt.Errorf("unknown resource type %q", request.TypeName))...)
+		diags = append(diags, typ.ErrorDiagnostics("no schema", fmt.Errorf("unknown resource type %q", request.TypeName))...)
 		return nil, diags
 	}
 
 	metaSchema := schema.ProviderMeta
 	capabilities := schema.ServerCapabilities
 
-	var response client.PlanResourceChangeResponse
+	var response typ.PlanResourceChangeResponse
 
 	// If the provider doesn't support planning a destroy operation, we can
 	// return immediately.
@@ -359,19 +359,19 @@ func (c *Client) PlanResourceChange(ctx context.Context, request client.PlanReso
 
 	priorMP, err := msgpack.Marshal(request.PriorState, configschema.SchemaBlockImpliedType(resSchema.Block))
 	if err != nil {
-		diags = append(diags, client.ErrorDiagnostics("msgpack marshal", err)...)
+		diags = append(diags, typ.ErrorDiagnostics("msgpack marshal", err)...)
 		return nil, diags
 	}
 
 	configMP, err := msgpack.Marshal(request.Config, configschema.SchemaBlockImpliedType(resSchema.Block))
 	if err != nil {
-		diags = append(diags, client.ErrorDiagnostics("msgpack marshal", err)...)
+		diags = append(diags, typ.ErrorDiagnostics("msgpack marshal", err)...)
 		return nil, diags
 	}
 
 	propMP, err := msgpack.Marshal(request.ProposedNewState, configschema.SchemaBlockImpliedType(resSchema.Block))
 	if err != nil {
-		diags = append(diags, client.ErrorDiagnostics("msgpack marshal", err)...)
+		diags = append(diags, typ.ErrorDiagnostics("msgpack marshal", err)...)
 		return nil, diags
 	}
 
@@ -387,7 +387,7 @@ func (c *Client) PlanResourceChange(ctx context.Context, request client.PlanReso
 	if metaSchema.Block != nil && len(metaSchema.Block.NestedBlocks)+len(metaSchema.Block.Attributes) != 0 {
 		metaMP, err := msgpack.Marshal(request.ProviderMeta, configschema.SchemaBlockImpliedType(resSchema.Block))
 		if err != nil {
-			diags = append(diags, client.ErrorDiagnostics("msgpack marshal", err)...)
+			diags = append(diags, typ.ErrorDiagnostics("msgpack marshal", err)...)
 			return nil, diags
 		}
 		protoReq.ProviderMeta = &tfprotov6.DynamicValue{MsgPack: metaMP}
@@ -395,7 +395,7 @@ func (c *Client) PlanResourceChange(ctx context.Context, request client.PlanReso
 
 	protoResp, err := c.client.PlanResourceChange(ctx, protoReq)
 	if err != nil {
-		diags = append(diags, client.RPCErrorDiagnostics(err)...)
+		diags = append(diags, typ.RPCErrorDiagnostics(err)...)
 		return nil, diags
 	}
 	respDiags := convert.DecodeDiagnostics(protoResp.Diagnostics)
@@ -406,7 +406,7 @@ func (c *Client) PlanResourceChange(ctx context.Context, request client.PlanReso
 
 	state, err := decodeDynamicValue(protoResp.PlannedState, configschema.SchemaBlockImpliedType(resSchema.Block))
 	if err != nil {
-		diags = append(diags, client.ErrorDiagnostics("decode dynamic value", err)...)
+		diags = append(diags, typ.ErrorDiagnostics("decode dynamic value", err)...)
 		return nil, diags
 	}
 	response.PlannedState = state
@@ -422,13 +422,13 @@ func (c *Client) PlanResourceChange(ctx context.Context, request client.PlanReso
 	return &response, diags
 }
 
-func (c *Client) ApplyResourceChange(ctx context.Context, request client.ApplyResourceChangeRequest) (*client.ApplyResourceChangeResponse, client.Diagnostics) {
-	var diags client.Diagnostics
+func (c *Client) ApplyResourceChange(ctx context.Context, request typ.ApplyResourceChangeRequest) (*typ.ApplyResourceChangeResponse, typ.Diagnostics) {
+	var diags typ.Diagnostics
 	schema := c.schemas
 
 	resSchema, ok := schema.ResourceTypes[request.TypeName]
 	if !ok {
-		diags = append(diags, client.ErrorDiagnostics("no schema", fmt.Errorf("unknown resource type %q", request.TypeName))...)
+		diags = append(diags, typ.ErrorDiagnostics("no schema", fmt.Errorf("unknown resource type %q", request.TypeName))...)
 		return nil, diags
 	}
 
@@ -436,17 +436,17 @@ func (c *Client) ApplyResourceChange(ctx context.Context, request client.ApplyRe
 
 	priorMP, err := msgpack.Marshal(request.PriorState, configschema.SchemaBlockImpliedType(resSchema.Block))
 	if err != nil {
-		diags = append(diags, client.ErrorDiagnostics("msgpack marshal", err)...)
+		diags = append(diags, typ.ErrorDiagnostics("msgpack marshal", err)...)
 		return nil, diags
 	}
 	plannedMP, err := msgpack.Marshal(request.PlannedState, configschema.SchemaBlockImpliedType(resSchema.Block))
 	if err != nil {
-		diags = append(diags, client.ErrorDiagnostics("msgpack marshal", err)...)
+		diags = append(diags, typ.ErrorDiagnostics("msgpack marshal", err)...)
 		return nil, diags
 	}
 	configMP, err := msgpack.Marshal(request.Config, configschema.SchemaBlockImpliedType(resSchema.Block))
 	if err != nil {
-		diags = append(diags, client.ErrorDiagnostics("msgpack marshal", err)...)
+		diags = append(diags, typ.ErrorDiagnostics("msgpack marshal", err)...)
 		return nil, diags
 	}
 
@@ -462,7 +462,7 @@ func (c *Client) ApplyResourceChange(ctx context.Context, request client.ApplyRe
 	if metaSchema.Block != nil && len(metaSchema.Block.NestedBlocks)+len(metaSchema.Block.Attributes) != 0 {
 		metaMP, err := msgpack.Marshal(request.ProviderMeta, configschema.SchemaBlockImpliedType(metaSchema.Block))
 		if err != nil {
-			diags = append(diags, client.ErrorDiagnostics("msgpack marshal", err)...)
+			diags = append(diags, typ.ErrorDiagnostics("msgpack marshal", err)...)
 			return nil, diags
 		}
 		protoReq.ProviderMeta = &tfprotov6.DynamicValue{MsgPack: metaMP}
@@ -470,7 +470,7 @@ func (c *Client) ApplyResourceChange(ctx context.Context, request client.ApplyRe
 
 	protoResp, err := c.client.ApplyResourceChange(ctx, protoReq)
 	if err != nil {
-		diags = append(diags, client.RPCErrorDiagnostics(err)...)
+		diags = append(diags, typ.RPCErrorDiagnostics(err)...)
 		return nil, diags
 	}
 	respDiags := convert.DecodeDiagnostics(protoResp.Diagnostics)
@@ -481,19 +481,19 @@ func (c *Client) ApplyResourceChange(ctx context.Context, request client.ApplyRe
 
 	state, err := decodeDynamicValue(protoResp.NewState, configschema.SchemaBlockImpliedType(metaSchema.Block))
 	if err != nil {
-		diags = append(diags, client.ErrorDiagnostics("msgpack marshal", err)...)
+		diags = append(diags, typ.ErrorDiagnostics("msgpack marshal", err)...)
 		return nil, diags
 	}
 
-	return &client.ApplyResourceChangeResponse{
+	return &typ.ApplyResourceChangeResponse{
 		NewState:         state,
 		Private:          protoResp.Private,
 		LegacyTypeSystem: protoResp.UnsafeToUseLegacyTypeSystem,
 	}, diags
 }
 
-func (c *Client) ImportResourceState(ctx context.Context, request client.ImportResourceStateRequest) (*client.ImportResourceStateResponse, client.Diagnostics) {
-	var diags client.Diagnostics
+func (c *Client) ImportResourceState(ctx context.Context, request typ.ImportResourceStateRequest) (*typ.ImportResourceStateResponse, typ.Diagnostics) {
+	var diags typ.Diagnostics
 
 	schema := c.schemas
 	resp, err := c.client.ImportResourceState(ctx, &tfprotov6.ImportResourceStateRequest{
@@ -501,7 +501,7 @@ func (c *Client) ImportResourceState(ctx context.Context, request client.ImportR
 		ID:       request.ID,
 	})
 	if err != nil {
-		return nil, client.RPCErrorDiagnostics(err)
+		return nil, typ.RPCErrorDiagnostics(err)
 	}
 
 	respDiags := convert.DecodeDiagnostics(resp.Diagnostics)
@@ -510,22 +510,22 @@ func (c *Client) ImportResourceState(ctx context.Context, request client.ImportR
 		return nil, diags
 	}
 
-	var response client.ImportResourceStateResponse
+	var response typ.ImportResourceStateResponse
 	for _, imported := range resp.ImportedResources {
-		resource := client.ImportedResource{
+		resource := typ.ImportedResource{
 			TypeName: imported.TypeName,
 			Private:  imported.Private,
 		}
 
 		resSchema, ok := schema.ResourceTypes[imported.TypeName]
 		if !ok {
-			diags = append(diags, client.ErrorDiagnostics("no schema", fmt.Errorf("unknown resource type %q", imported.TypeName))...)
+			diags = append(diags, typ.ErrorDiagnostics("no schema", fmt.Errorf("unknown resource type %q", imported.TypeName))...)
 			continue
 		}
 
 		state, err := decodeDynamicValue(imported.State, configschema.SchemaBlockImpliedType(resSchema.Block))
 		if err != nil {
-			diags = append(diags, client.ErrorDiagnostics("decode dynamic value", err)...)
+			diags = append(diags, typ.ErrorDiagnostics("decode dynamic value", err)...)
 			return nil, diags
 		}
 		resource.State = state
@@ -536,13 +536,13 @@ func (c *Client) ImportResourceState(ctx context.Context, request client.ImportR
 	return &response, diags
 }
 
-func (c *Client) ReadDataSource(ctx context.Context, request client.ReadDataSourceRequest) (*client.ReadDataSourceResponse, client.Diagnostics) {
-	var diags client.Diagnostics
+func (c *Client) ReadDataSource(ctx context.Context, request typ.ReadDataSourceRequest) (*typ.ReadDataSourceResponse, typ.Diagnostics) {
+	var diags typ.Diagnostics
 	schema := c.schemas
 
 	dsSchema, ok := schema.DataSources[request.TypeName]
 	if !ok {
-		diags = append(diags, client.ErrorDiagnostics("no schema", fmt.Errorf("unknown data source type %q", request.TypeName))...)
+		diags = append(diags, typ.ErrorDiagnostics("no schema", fmt.Errorf("unknown data source type %q", request.TypeName))...)
 		return nil, diags
 	}
 
@@ -550,7 +550,7 @@ func (c *Client) ReadDataSource(ctx context.Context, request client.ReadDataSour
 
 	mp, err := msgpack.Marshal(request.Config, configschema.SchemaBlockImpliedType(dsSchema.Block))
 	if err != nil {
-		diags = append(diags, client.ErrorDiagnostics("msgpack marshal", err)...)
+		diags = append(diags, typ.ErrorDiagnostics("msgpack marshal", err)...)
 		return nil, diags
 	}
 
@@ -563,7 +563,7 @@ func (c *Client) ReadDataSource(ctx context.Context, request client.ReadDataSour
 	if metaSchema.Block != nil && len(metaSchema.Block.NestedBlocks)+len(metaSchema.Block.Attributes) != 0 {
 		metaMP, err := msgpack.Marshal(request.ProviderMeta, configschema.SchemaBlockImpliedType(metaSchema.Block))
 		if err != nil {
-			diags = append(diags, client.ErrorDiagnostics("msgpack marshal", err)...)
+			diags = append(diags, typ.ErrorDiagnostics("msgpack marshal", err)...)
 			return nil, diags
 		}
 		protoReq.ProviderMeta = &tfprotov6.DynamicValue{MsgPack: metaMP}
@@ -571,7 +571,7 @@ func (c *Client) ReadDataSource(ctx context.Context, request client.ReadDataSour
 
 	resp, err := c.client.ReadDataSource(ctx, protoReq)
 	if err != nil {
-		diags = append(diags, client.RPCErrorDiagnostics(err)...)
+		diags = append(diags, typ.RPCErrorDiagnostics(err)...)
 		return nil, diags
 	}
 
@@ -583,11 +583,11 @@ func (c *Client) ReadDataSource(ctx context.Context, request client.ReadDataSour
 
 	state, err := decodeDynamicValue(resp.State, configschema.SchemaBlockImpliedType(dsSchema.Block))
 	if err != nil {
-		diags = append(diags, client.ErrorDiagnostics("decode dynamic value", err)...)
+		diags = append(diags, typ.ErrorDiagnostics("decode dynamic value", err)...)
 		return nil, diags
 	}
 
-	return &client.ReadDataSourceResponse{
+	return &typ.ReadDataSourceResponse{
 		State: state,
 	}, diags
 }

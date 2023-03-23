@@ -5,17 +5,17 @@ package convert
 import (
 	"github.com/hashicorp/terraform-plugin-go/tfprotov5"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
-	"github.com/magodo/terraform-client-go/tfclient/client"
+	"github.com/magodo/terraform-client-go/tfclient/typ"
 	"github.com/zclconf/go-cty/cty"
 )
 
-func DecodeDiagnostics(raws []*tfprotov5.Diagnostic) client.Diagnostics {
+func DecodeDiagnostics(raws []*tfprotov5.Diagnostic) typ.Diagnostics {
 	if len(raws) == 0 {
 		return nil
 	}
-	diags := make(client.Diagnostics, 0, len(raws))
+	diags := make(typ.Diagnostics, 0, len(raws))
 	for _, raw := range raws {
-		diag := client.Diagnostic{
+		diag := typ.Diagnostic{
 			Summary:   raw.Summary,
 			Detail:    raw.Detail,
 			Attribute: DecodeAttributePath(raw.Attribute),
@@ -23,9 +23,9 @@ func DecodeDiagnostics(raws []*tfprotov5.Diagnostic) client.Diagnostics {
 
 		switch raw.Severity {
 		case tfprotov5.DiagnosticSeverityError:
-			diag.Severity = client.Error
+			diag.Severity = typ.Error
 		case tfprotov5.DiagnosticSeverityWarning:
-			diag.Severity = client.Warning
+			diag.Severity = typ.Warning
 		}
 
 		diags = append(diags, diag)

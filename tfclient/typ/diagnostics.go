@@ -1,6 +1,6 @@
 // Logic is derived from: github.com/apparentlymart/terraform-provider/tfprovider/internal/common/diagnostics.go (ba059c82d80b5c662af2b0e9de2416903ff05e44)
 
-package client
+package typ
 
 import (
 	"bytes"

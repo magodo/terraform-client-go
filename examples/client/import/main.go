@@ -10,8 +10,8 @@ import (
 
 	"github.com/hashicorp/go-hclog"
 	"github.com/magodo/terraform-client-go/tfclient"
-	"github.com/magodo/terraform-client-go/tfclient/client"
 	"github.com/magodo/terraform-client-go/tfclient/configschema"
+	"github.com/magodo/terraform-client-go/tfclient/typ"
 	"github.com/zclconf/go-cty/cty"
 	ctyjson "github.com/zclconf/go-cty/cty/json"
 )
@@ -48,12 +48,12 @@ func main() {
 		log.Fatal(err)
 	}
 
-	_, diags = c.ConfigureProvider(ctx, client.ConfigureProviderRequest{
+	_, diags = c.ConfigureProvider(ctx, typ.ConfigureProviderRequest{
 		Config: config,
 	})
 	showDiags(diags)
 
-	importResp, diags := c.ImportResourceState(ctx, client.ImportResourceStateRequest{
+	importResp, diags := c.ImportResourceState(ctx, typ.ImportResourceStateRequest{
 		TypeName: *resourceType,
 		ID:       *resourceId,
 	})
@@ -63,7 +63,7 @@ func main() {
 		log.Fatalf("expect 1 resource, got=%d", len(importResp.ImportedResources))
 	}
 	res := importResp.ImportedResources[0]
-	readResp, diags := c.ReadResource(ctx, client.ReadResourceRequest{
+	readResp, diags := c.ReadResource(ctx, typ.ReadResourceRequest{
 		TypeName:     res.TypeName,
 		PriorState:   res.State,
 		Private:      res.Private,
@@ -73,9 +73,9 @@ func main() {
 	fmt.Println(readResp.NewState.GoString())
 }
 
-func showDiags(diags client.Diagnostics) {
+func showDiags(diags typ.Diagnostics) {
 	for _, diag := range diags {
-		if diag.Severity == client.Error {
+		if diag.Severity == typ.Error {
 			log.Fatal(diag.Summary + ": " + diag.Detail)
 		}
 	}

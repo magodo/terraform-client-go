@@ -1,6 +1,6 @@
 // This is derived from github.com/hashicorp/terraform/internal/providers/provider.go (15ecdb66c84cd8202b0ae3d34c44cb4bbece5444)
 
-package client
+package typ
 
 import (
 	tfjson "github.com/hashicorp/terraform-json"
