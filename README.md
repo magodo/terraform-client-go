@@ -33,3 +33,7 @@ There are a lot of code duplication&adoption from different sources, for a reaso
     - The client interface implementations for the two protocols
 
 There is a Terraform module (*tools/upstream-change-monitor*) being used to keep track of the upstream file changes.
+
+## Credit
+
+Parts of this project were adopted from [https://github.com/hashicorp/terraform-plugin-go](https://github.com/hashicorp/terraform-plugin-go) and [https://github.com/hashicorp/terraform](https://github.com/hashicorp/terraform). I'd like to thank Hashicorp for all these great works!
