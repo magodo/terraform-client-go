@@ -19,6 +19,7 @@ func main() {
 	pluginPath := flag.String("path", "", "The path to the plugin")
 	resourceType := flag.String("type", "", "The resource type")
 	resourceId := flag.String("id", "", "The resource id")
+	providerCfg := flag.String("cfg", "{}", "The content of provider config block in JSON")
 	flag.Parse()
 
 	logger := hclog.New(&hclog.LoggerOptions{
@@ -52,7 +53,7 @@ func main() {
 	showDiags(resp.Diagnostics)
 
 	providerConfigType := resp.Provider.Block.ValueType()
-	providerConfigVal, err := tftypes.ValueFromJSONWithOpts([]byte(`{"features": []}`), providerConfigType, tftypes.ValueFromJSONOpts{})
+	providerConfigVal, err := tftypes.ValueFromJSONWithOpts([]byte(*providerCfg), providerConfigType, tftypes.ValueFromJSONOpts{})
 	if err != nil {
 		log.Fatal(err)
 	}

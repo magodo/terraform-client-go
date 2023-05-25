@@ -21,6 +21,7 @@ func main() {
 	resourceType := flag.String("type", "", "The resource type")
 	resourceId := flag.String("id", "", "The resource id")
 	logLevel := flag.String("log-level", hclog.Error.String(), "Log level")
+	providerCfg := flag.String("cfg", "{}", "The content of provider config block in JSON")
 	flag.Parse()
 
 	logger := hclog.New(&hclog.LoggerOptions{
@@ -44,7 +45,7 @@ func main() {
 	schResp, diags := c.GetProviderSchema()
 	showDiags(diags)
 
-	config, err := ctyjson.Unmarshal([]byte(`{"features": []}`), configschema.SchemaBlockImpliedType(schResp.Provider.Block))
+	config, err := ctyjson.Unmarshal([]byte(*providerCfg), configschema.SchemaBlockImpliedType(schResp.Provider.Block))
 	if err != nil {
 		log.Fatal(err)
 	}
