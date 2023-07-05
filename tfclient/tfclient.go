@@ -130,7 +130,6 @@ func newRaw(opts Option) (*RawClient, int, error) {
 
 	config := &plugin.ClientConfig{
 		HandshakeConfig:  handshake,
-		VersionedPlugins: versionedPlugins,
 		Cmd:              opts.Cmd,
 		Reattach:         opts.Reattach,
 		SecureConfig:     opts.SecureConfig,
@@ -146,6 +145,19 @@ func newRaw(opts Option) (*RawClient, int, error) {
 		Logger:           opts.Logger,
 		AutoMTLS:         opts.AutoMTLS,
 		GRPCDialOptions:  opts.GRPCDialOptions,
+	}
+
+	if reattach := opts.Reattach; reattach == nil {
+		config.VersionedPlugins = versionedPlugins
+	} else {
+		// Reference: https://github.com/hashicorp/terraform/blob/15ecdb66c84cd8202b0ae3d34c44cb4bbece5444/internal/command/meta_providers.go#L425
+		if pv := reattach.ProtocolVersion; pv == 0 {
+			config.Plugins = versionedPlugins[5]
+		} else if plugins, ok := versionedPlugins[pv]; ok {
+			config.Plugins = plugins
+		} else {
+			return nil, 0, fmt.Errorf("no supported plugins for protocol %d", pv)
+		}
 	}
 
 	var client RawClient
