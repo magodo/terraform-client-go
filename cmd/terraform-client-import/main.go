@@ -84,8 +84,7 @@ func main() {
 
 	state := res.State
 	if *statePatch != "" {
-		simpleJSON := ctyjson.SimpleJSONValue{Value: state}
-		b, err := simpleJSON.MarshalJSON()
+		b, err := ctyjson.Marshal(state, state.Type())
 		if err != nil {
 			log.Fatalf("marshalling the state: %v", err)
 		}
@@ -93,10 +92,10 @@ func main() {
 		if err != nil {
 			log.Fatalf("patching the state: %v", err)
 		}
-		if err := simpleJSON.UnmarshalJSON(b); err != nil {
+		state, err = ctyjson.Unmarshal(b, state.Type())
+		if err != nil {
 			log.Fatalf("unmarshalling the patched state: %v", err)
 		}
-		state = simpleJSON.Value
 	}
 
 	readResp, diags := c.ReadResource(ctx, typ.ReadResourceRequest{
