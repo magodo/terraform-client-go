@@ -5,6 +5,7 @@ go 1.20
 require (
 	github.com/apparentlymart/go-dump v0.0.0-20180507223929-23540a00eaa3
 	github.com/davecgh/go-spew v1.1.1
+	github.com/evanphx/json-patch/v5 v5.6.0
 	github.com/google/go-cmp v0.5.9
 	github.com/hashicorp/go-hclog v1.2.1
 	github.com/hashicorp/go-plugin v1.4.8
@@ -29,6 +30,7 @@ require (
 	github.com/mitchellh/go-testing-interface v1.14.1 // indirect
 	github.com/mitchellh/go-wordwrap v0.0.0-20150314170334-ad45545899c7 // indirect
 	github.com/oklog/run v1.0.0 // indirect
+	github.com/pkg/errors v0.8.1 // indirect
 	github.com/vmihailenco/msgpack/v4 v4.3.12 // indirect
 	github.com/vmihailenco/msgpack/v5 v5.3.5 // indirect
 	github.com/vmihailenco/tagparser v0.1.1 // indirect

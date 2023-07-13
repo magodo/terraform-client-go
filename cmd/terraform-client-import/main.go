@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 
+	jsonpatch "github.com/evanphx/json-patch/v5"
 	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/go-plugin"
 	"github.com/magodo/terraform-client-go/tfclient"
@@ -26,6 +27,7 @@ func main() {
 	resourceId := flag.String("id", "", "The resource id")
 	logLevel := flag.String("log-level", hclog.Error.String(), "Log level")
 	providerCfg := flag.String("cfg", "{}", "The content of provider config block in JSON")
+	statePatch := flag.String("state-patch", "", "The patch to the state after importing, which will then be used as the prior state for reading")
 	flag.Parse()
 
 	logger := hclog.New(&hclog.LoggerOptions{
@@ -35,8 +37,8 @@ func main() {
 	})
 
 	opts := tfclient.Option{
-		Cmd:      exec.Command(*pluginPath),
-		Logger:   logger,
+		Cmd:    exec.Command(*pluginPath),
+		Logger: logger,
 	}
 
 	reattach, err := parseReattach(os.Getenv("TF_REATTACH_PROVIDERS"))
@@ -79,9 +81,27 @@ func main() {
 		log.Fatalf("expect 1 resource, got=%d", len(importResp.ImportedResources))
 	}
 	res := importResp.ImportedResources[0]
+
+	state := res.State
+	if *statePatch != "" {
+		simpleJSON := ctyjson.SimpleJSONValue{Value: state}
+		b, err := simpleJSON.MarshalJSON()
+		if err != nil {
+			log.Fatalf("marshalling the state: %v", err)
+		}
+		b, err = jsonpatch.MergePatch(b, []byte(*statePatch))
+		if err != nil {
+			log.Fatalf("patching the state: %v", err)
+		}
+		if err := simpleJSON.UnmarshalJSON(b); err != nil {
+			log.Fatalf("unmarshalling the patched state: %v", err)
+		}
+		state = simpleJSON.Value
+	}
+
 	readResp, diags := c.ReadResource(ctx, typ.ReadResourceRequest{
 		TypeName:     res.TypeName,
-		PriorState:   res.State,
+		PriorState:   state,
 		Private:      res.Private,
 		ProviderMeta: cty.Value{},
 	})
