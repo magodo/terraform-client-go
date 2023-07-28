@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"log"
 	"net"
 	"os"
 	"os/exec"
@@ -21,29 +20,47 @@ import (
 	ctyjson "github.com/zclconf/go-cty/cty/json"
 )
 
+type FlagSet struct {
+	PluginPath   string
+	ResourceType string
+	ResourceId   string
+	LogLevel     string
+	ProviderCfg  string
+	StatePatch   string
+}
+
 func main() {
-	pluginPath := flag.String("path", "", "The path to the plugin")
-	resourceType := flag.String("type", "", "The resource type")
-	resourceId := flag.String("id", "", "The resource id")
-	logLevel := flag.String("log-level", hclog.Error.String(), "Log level")
-	providerCfg := flag.String("cfg", "{}", "The content of provider config block in JSON")
-	statePatch := flag.String("state-patch", "", "The patch to the state after importing, which will then be used as the prior state for reading")
+	var fset FlagSet
+	flag.StringVar(&fset.PluginPath, "path", "", "The path to the plugin")
+	flag.StringVar(&fset.ResourceType, "type", "", "The resource type")
+	flag.StringVar(&fset.ResourceId, "id", "", "The resource id")
+	flag.StringVar(&fset.LogLevel, "log-level", hclog.Error.String(), "Log level")
+	flag.StringVar(&fset.ProviderCfg, "cfg", "{}", "The content of provider config block in JSON")
+	flag.StringVar(&fset.StatePatch, "state-patch", "", "The patch to the state after importing, which will then be used as the prior state for reading")
+
 	flag.Parse()
 
 	logger := hclog.New(&hclog.LoggerOptions{
 		Output: hclog.DefaultOutput,
-		Level:  hclog.LevelFromString(*logLevel),
-		Name:   filepath.Base(*pluginPath),
+		Level:  hclog.LevelFromString(fset.LogLevel),
+		Name:   filepath.Base(fset.PluginPath),
 	})
 
+	if err := realMain(logger, fset); err != nil {
+		logger.Error(err.Error())
+		os.Exit(1)
+	}
+}
+
+func realMain(logger hclog.Logger, fset FlagSet) error {
 	opts := tfclient.Option{
-		Cmd:    exec.Command(*pluginPath),
+		Cmd:    exec.Command(fset.PluginPath),
 		Logger: logger,
 	}
 
 	reattach, err := parseReattach(os.Getenv("TF_REATTACH_PROVIDERS"))
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 	if reattach != nil {
 		opts.Cmd = nil
@@ -52,49 +69,55 @@ func main() {
 
 	c, err := tfclient.New(opts)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 	defer c.Close()
 
 	ctx := context.TODO()
 
 	schResp, diags := c.GetProviderSchema()
-	showDiags(diags)
+	if err := showDiags(logger, diags); err != nil {
+		return err
+	}
 
-	config, err := ctyjson.Unmarshal([]byte(*providerCfg), configschema.SchemaBlockImpliedType(schResp.Provider.Block))
+	config, err := ctyjson.Unmarshal([]byte(fset.ProviderCfg), configschema.SchemaBlockImpliedType(schResp.Provider.Block))
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	_, diags = c.ConfigureProvider(ctx, typ.ConfigureProviderRequest{
 		Config: config,
 	})
-	showDiags(diags)
+	if err := showDiags(logger, diags); err != nil {
+		return err
+	}
 
 	importResp, diags := c.ImportResourceState(ctx, typ.ImportResourceStateRequest{
-		TypeName: *resourceType,
-		ID:       *resourceId,
+		TypeName: fset.ResourceType,
+		ID:       fset.ResourceId,
 	})
-	showDiags(diags)
+	if err := showDiags(logger, diags); err != nil {
+		return err
+	}
 
 	if len(importResp.ImportedResources) != 1 {
-		log.Fatalf("expect 1 resource, got=%d", len(importResp.ImportedResources))
+		return fmt.Errorf("expect 1 resource, got=%d", len(importResp.ImportedResources))
 	}
 	res := importResp.ImportedResources[0]
 
 	state := res.State
-	if *statePatch != "" {
+	if fset.StatePatch != "" {
 		b, err := ctyjson.Marshal(state, state.Type())
 		if err != nil {
-			log.Fatalf("marshalling the state: %v", err)
+			return fmt.Errorf("marshalling the state: %v", err)
 		}
-		b, err = jsonpatch.MergePatch(b, []byte(*statePatch))
+		b, err = jsonpatch.MergePatch(b, []byte(fset.StatePatch))
 		if err != nil {
-			log.Fatalf("patching the state: %v", err)
+			return fmt.Errorf("patching the state: %v", err)
 		}
 		state, err = ctyjson.Unmarshal(b, state.Type())
 		if err != nil {
-			log.Fatalf("unmarshalling the patched state: %v", err)
+			return fmt.Errorf("unmarshalling the patched state: %v", err)
 		}
 	}
 
@@ -104,25 +127,29 @@ func main() {
 		Private:      res.Private,
 		ProviderMeta: cty.Value{},
 	})
-	showDiags(diags)
+	if err := showDiags(logger, diags); err != nil {
+		return err
+	}
 
-	b, err := ctyjson.Marshal(readResp.NewState, configschema.SchemaBlockImpliedType(schResp.ResourceTypes[*resourceType].Block))
+	b, err := ctyjson.Marshal(readResp.NewState, configschema.SchemaBlockImpliedType(schResp.ResourceTypes[fset.ResourceType].Block))
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	fmt.Println(string(b))
+	return nil
 }
 
-func showDiags(diags typ.Diagnostics) {
+func showDiags(logger hclog.Logger, diags typ.Diagnostics) error {
 	for _, diag := range diags {
 		if diag.Severity == typ.Error {
-			log.Fatal(diag.Summary + ": " + diag.Detail)
+			return fmt.Errorf("%s: %s", diag.Summary, diag.Detail)
 		}
 	}
 	if len(diags) != 0 {
-		fmt.Println(diags.Err())
+		logger.Warn(diags.Err().Error())
 	}
+	return nil
 }
 
 func parseReattach(in string) (*plugin.ReattachConfig, error) {
@@ -150,8 +177,10 @@ func parseReattach(in string) (*plugin.ReattachConfig, error) {
 	}
 
 	var c reattachConfig
-	for _, v := range m {
+	var p string
+	for k, v := range m {
 		c = v
+		p = k
 	}
 
 	var addr net.Addr
@@ -167,7 +196,7 @@ func parseReattach(in string) (*plugin.ReattachConfig, error) {
 			return nil, fmt.Errorf("Invalid TCP address %q: %w", c.Addr.String, err)
 		}
 	default:
-		return nil, fmt.Errorf("Unknown address type %q for %q", c.Addr.Network)
+		return nil, fmt.Errorf("Unknown address type %q for %q", c.Addr.Network, p)
 	}
 	return &plugin.ReattachConfig{
 		Protocol:        plugin.Protocol(c.Protocol),
