@@ -21,13 +21,32 @@ import (
 	ctyjson "github.com/zclconf/go-cty/cty/json"
 )
 
+type JSONPatches []jsonpatch.Patch
+
+func (pl *JSONPatches) String() string {
+	return fmt.Sprint(*pl)
+}
+
+func (pl *JSONPatches) Set(value string) error {
+	p, err := jsonpatch.DecodePatch([]byte(value))
+	if err != nil {
+		return fmt.Errorf("decoding patch %s: %v", value, err)
+	}
+	*pl = append(*pl, p)
+	return nil
+
+}
+
 func main() {
 	pluginPath := flag.String("path", "", "The path to the plugin")
 	resourceType := flag.String("type", "", "The resource type")
 	resourceId := flag.String("id", "", "The resource id")
 	logLevel := flag.String("log-level", hclog.Error.String(), "Log level")
 	providerCfg := flag.String("cfg", "{}", "The content of provider config block in JSON")
-	statePatch := flag.String("state-patch", "", "The patch to the state after importing, which will then be used as the prior state for reading")
+
+	var statePatches JSONPatches
+	flag.Var(&statePatches, "state-patch", "The JSON patch to the state after importing, which will then be used as the prior state for reading. Can be specified multiple times")
+
 	flag.Parse()
 
 	logger := hclog.New(&hclog.LoggerOptions{
@@ -83,18 +102,20 @@ func main() {
 	res := importResp.ImportedResources[0]
 
 	state := res.State
-	if *statePatch != "" {
-		b, err := ctyjson.Marshal(state, state.Type())
-		if err != nil {
-			log.Fatalf("marshalling the state: %v", err)
-		}
-		b, err = jsonpatch.MergePatch(b, []byte(*statePatch))
-		if err != nil {
-			log.Fatalf("patching the state: %v", err)
-		}
-		state, err = ctyjson.Unmarshal(b, state.Type())
-		if err != nil {
-			log.Fatalf("unmarshalling the patched state: %v", err)
+	if statePatches != nil {
+		for _, patch := range statePatches {
+			b, err := ctyjson.Marshal(state, state.Type())
+			if err != nil {
+				log.Fatalf("marshalling the state: %v", err)
+			}
+			nb, err := patch.Apply(b)
+			if err != nil {
+				log.Fatalf("patching the state %s: %v", string(b), err)
+			}
+			state, err = ctyjson.Unmarshal(nb, state.Type())
+			if err != nil {
+				log.Fatalf("unmarshalling the patched state: %v", err)
+			}
 		}
 	}
 
