@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"log"
 	"net"
 	"os"
 	"os/exec"
@@ -43,7 +42,7 @@ type FlagSet struct {
 	ResourceId   string
 	LogLevel     string
 	ProviderCfg  string
-	StatePatchesNPatches
+	StatePatches JSONPatches
 }
 
 func main() {
@@ -127,15 +126,15 @@ func realMain(logger hclog.Logger, fset FlagSet) error {
 		for _, patch := range fset.StatePatches {
 			b, err := ctyjson.Marshal(state, state.Type())
 			if err != nil {
-				return fmt.Errrof("marshalling the state: %v", err)
+				return fmt.Errorf("marshalling the state: %v", err)
 			}
 			nb, err := patch.Apply(b)
 			if err != nil {
-				return fmt.Errrof("patching the state %s: %v", string(b), err)
+				return fmt.Errorf("patching the state %s: %v", string(b), err)
 			}
 			state, err = ctyjson.Unmarshal(nb, state.Type())
 			if err != nil {
-				return fmt.Errrof("unmarshalling the patched state: %v", err)
+				return fmt.Errorf("unmarshalling the patched state: %v", err)
 			}
 		}
 	}
