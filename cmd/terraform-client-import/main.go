@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"time"
 
 	jsonpatch "github.com/evanphx/json-patch/v5"
 	"github.com/hashicorp/go-hclog"
@@ -43,6 +44,7 @@ type FlagSet struct {
 	LogLevel     string
 	ProviderCfg  string
 	StatePatches JSONPatches
+	TimeoutSec   int
 }
 
 func main() {
@@ -53,6 +55,7 @@ func main() {
 	flag.StringVar(&fset.LogLevel, "log-level", hclog.Error.String(), "Log level")
 	flag.StringVar(&fset.ProviderCfg, "cfg", "{}", "The content of provider config block in JSON")
 	flag.Var(&fset.StatePatches, "state-patch", "The JSON patch to the state after importing, which will then be used as the prior state for reading. Can be specified multiple times")
+	flag.IntVar(&fset.TimeoutSec, "timeout", 0, "Timeout in second. Defaults to no timeout.")
 
 	flag.Parse()
 
@@ -90,6 +93,11 @@ func realMain(logger hclog.Logger, fset FlagSet) error {
 	defer c.Close()
 
 	ctx := context.TODO()
+	var cancel context.CancelFunc
+	if fset.TimeoutSec > 0 {
+		ctx, cancel = context.WithTimeout(ctx, time.Second*time.Duration(fset.TimeoutSec))
+		defer cancel()
+	}
 
 	schResp, diags := c.GetProviderSchema()
 	if err := showDiags(logger, diags); err != nil {
