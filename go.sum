@@ -54,10 +54,10 @@ github.com/kylelemons/godebug v0.0.0-20170820004349-d65d576e9348 h1:MtvEpTB6LX3v
 github.com/kylelemons/godebug v0.0.0-20170820004349-d65d576e9348/go.mod h1:B69LEHPfb2qLo0BaaOLcbitczOKLWTsrBG9LczfCD4k=
 github.com/magodo/chanio v0.0.0-20230905063744-5f1bf45eacbc h1:OA/l08Abuwg0v3g6piwgnHzK8QcV+rgUwrmvKSSVT28=
 github.com/magodo/chanio v0.0.0-20230905063744-5f1bf45eacbc/go.mod h1:h8znBXxSpGVpiLc79RwAaMndx+d3DrnynGlmbxPWcX8=
-github.com/magodo/go-plugin v1.4.2-0.20230914083440-5d1381c1ae5a h1:43DmWH+c2QJ/hp81dVRlPeZ2z82pTw6cuXTqNxfa+vs=
-github.com/magodo/go-plugin v1.4.2-0.20230914083440-5d1381c1ae5a/go.mod h1:ztmNe7EZqJ6mGSC875thfPTf5/6VMxXNXaDTWFFw9ow=
-github.com/magodo/go-wasmww v0.0.0-20230914064632-eea21c04fd19 h1:spNynARmmILlTjkiULzQdx3eZDT5SBpWrQJMj1O0fZ0=
-github.com/magodo/go-wasmww v0.0.0-20230914064632-eea21c04fd19/go.mod h1:3Da4y024Wt+xMHGKEdkLx8wBn4ZF0wC4XtzHKzNCLjA=
+github.com/magodo/go-plugin v1.4.2-0.20230914105016-cb062573f984 h1:+rt5rxzv9ojQxc/IEXqJUrOqG+/ypXT4lxUhp4G6xsI=
+github.com/magodo/go-plugin v1.4.2-0.20230914105016-cb062573f984/go.mod h1:YjvQ+QZyEoS2jC6CEJ2RyuZ8U+z/9pzuU3f8Ae/Ucvg=
+github.com/magodo/go-wasmww v0.0.0-20230914104912-44ee4b8129d0 h1:SfYASTr54LsLpjaMJednJND9DEmBtJIR58j2nF0PoqM=
+github.com/magodo/go-wasmww v0.0.0-20230914104912-44ee4b8129d0/go.mod h1:3Da4y024Wt+xMHGKEdkLx8wBn4ZF0wC4XtzHKzNCLjA=
 github.com/magodo/go-webworkers v0.0.0-20230912130354-7cb7781df4ee h1:XaNsxpodBifEAUm5iFCT0oxFw+OVmlCRxwBfqOd/Gi8=
 github.com/magodo/go-webworkers v0.0.0-20230912130354-7cb7781df4ee/go.mod h1:75pYYUWzQZKwI7HXgCOD6CAqEvNhln+yyxV3vIJWxaE=
 github.com/mattn/go-colorable v0.1.9/go.mod h1:u6P/XSegPjTcexA+o6vUJrdnUu04hMope9wVRipJSqc=

@@ -30,7 +30,7 @@ require (
 	github.com/hashicorp/go-version v1.6.0 // indirect
 	github.com/hashicorp/yamux v0.0.0-20180604194846-3520598351bb // indirect
 	github.com/magodo/chanio v0.0.0-20230905063744-5f1bf45eacbc // indirect
-	github.com/magodo/go-wasmww v0.0.0-20230914064632-eea21c04fd19 // indirect
+	github.com/magodo/go-wasmww v0.0.0-20230914104912-44ee4b8129d0 // indirect
 	github.com/magodo/go-webworkers v0.0.0-20230912130354-7cb7781df4ee // indirect
 	github.com/mattn/go-colorable v0.1.12 // indirect
 	github.com/mattn/go-isatty v0.0.14 // indirect
@@ -49,4 +49,4 @@ require (
 	google.golang.org/genproto v0.0.0-20230110181048-76db0878b65f // indirect
 )
 
-replace github.com/hashicorp/go-plugin => github.com/magodo/go-plugin v1.4.2-0.20230914083440-5d1381c1ae5a
+replace github.com/hashicorp/go-plugin => github.com/magodo/go-plugin v1.4.2-0.20230914105016-cb062573f984
