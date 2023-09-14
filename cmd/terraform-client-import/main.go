@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"time"
 
 	jsonpatch "github.com/evanphx/json-patch/v5"
@@ -45,6 +46,7 @@ type FlagSet struct {
 	ProviderCfg  string
 	StatePatches JSONPatches
 	TimeoutSec   int
+	LogPlugin    bool
 }
 
 func main() {
@@ -56,6 +58,7 @@ func main() {
 	flag.StringVar(&fset.ProviderCfg, "cfg", "{}", "The content of provider config block in JSON")
 	flag.Var(&fset.StatePatches, "state-patch", "The JSON patch to the state after importing, which will then be used as the prior state for reading. Can be specified multiple times")
 	flag.IntVar(&fset.TimeoutSec, "timeout", 0, "Timeout in second. Defaults to no timeout.")
+	flag.BoolVar(&fset.LogPlugin, "log-plugin", false, "Whether to show the plugin log (WASM only)")
 
 	flag.Parse()
 
@@ -75,6 +78,15 @@ func realMain(logger hclog.Logger, fset FlagSet) error {
 	opts := tfclient.Option{
 		Cmd:    exec.Command(fset.PluginPath),
 		Logger: logger,
+	}
+
+	// For WASM, the plugin log is not routed via pipe, instead, all plugin logs are routed via the RPC stdio channel.
+	// We only include the plugin logs for trace level.
+	if runtime.GOOS == "js" && runtime.GOARCH == "wasm" {
+		if fset.LogPlugin {
+			opts.SyncStdout = os.Stdout
+			opts.SyncStderr = os.Stderr
+		}
 	}
 
 	reattach, err := parseReattach(os.Getenv("TF_REATTACH_PROVIDERS"))
