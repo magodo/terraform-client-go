@@ -2,8 +2,10 @@ package tfclient
 
 import (
 	"crypto/tls"
+	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"os/exec"
 	"time"
 
@@ -189,4 +191,59 @@ func newRaw(opts Option) (*RawClient, int, error) {
 	default:
 		return nil, 0, fmt.Errorf("unsupported protocol version %d", protoVer)
 	}
+}
+
+func ParseReattach(in string) (*plugin.ReattachConfig, error) {
+	if in == "" {
+		return nil, nil
+	}
+
+	type reattachConfig struct {
+		Protocol        string
+		ProtocolVersion int
+		Addr            struct {
+			Network string
+			String  string
+		}
+		Pid  int
+		Test bool
+	}
+	var m map[string]reattachConfig
+	err := json.Unmarshal([]byte(in), &m)
+	if err != nil {
+		return nil, fmt.Errorf("Invalid format for TF_REATTACH_PROVIDERS: %w", err)
+	}
+	if len(m) != 1 {
+		return nil, fmt.Errorf("expect only one of provider specified in the TF_REATTACH_PROVIDERS, got=%d", len(m))
+	}
+
+	var c reattachConfig
+	var p string
+	for k, v := range m {
+		c = v
+		p = k
+	}
+
+	var addr net.Addr
+	switch c.Addr.Network {
+	case "unix":
+		addr, err = net.ResolveUnixAddr("unix", c.Addr.String)
+		if err != nil {
+			return nil, fmt.Errorf("Invalid unix socket path %q: %w", c.Addr.String, err)
+		}
+	case "tcp":
+		addr, err = net.ResolveTCPAddr("tcp", c.Addr.String)
+		if err != nil {
+			return nil, fmt.Errorf("Invalid TCP address %q: %w", c.Addr.String, err)
+		}
+	default:
+		return nil, fmt.Errorf("Unknown address type %q for %q", c.Addr.Network, p)
+	}
+	return &plugin.ReattachConfig{
+		Protocol:        plugin.Protocol(c.Protocol),
+		ProtocolVersion: c.ProtocolVersion,
+		Pid:             c.Pid,
+		Test:            c.Test,
+		Addr:            addr,
+	}, nil
 }

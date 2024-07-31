@@ -2,10 +2,8 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"flag"
 	"fmt"
-	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -13,7 +11,6 @@ import (
 
 	jsonpatch "github.com/evanphx/json-patch/v5"
 	"github.com/hashicorp/go-hclog"
-	"github.com/hashicorp/go-plugin"
 	"github.com/magodo/terraform-client-go/tfclient"
 	"github.com/magodo/terraform-client-go/tfclient/configschema"
 	"github.com/magodo/terraform-client-go/tfclient/typ"
@@ -77,7 +74,7 @@ func realMain(logger hclog.Logger, fset FlagSet) error {
 		Logger: logger,
 	}
 
-	reattach, err := parseReattach(os.Getenv("TF_REATTACH_PROVIDERS"))
+	reattach, err := tfclient.ParseReattach(os.Getenv("TF_REATTACH_PROVIDERS"))
 	if err != nil {
 		return err
 	}
@@ -176,59 +173,4 @@ func showDiags(logger hclog.Logger, diags typ.Diagnostics) error {
 		logger.Warn(diags.Err().Error())
 	}
 	return nil
-}
-
-func parseReattach(in string) (*plugin.ReattachConfig, error) {
-	if in == "" {
-		return nil, nil
-	}
-
-	type reattachConfig struct {
-		Protocol        string
-		ProtocolVersion int
-		Addr            struct {
-			Network string
-			String  string
-		}
-		Pid  int
-		Test bool
-	}
-	var m map[string]reattachConfig
-	err := json.Unmarshal([]byte(in), &m)
-	if err != nil {
-		return nil, fmt.Errorf("Invalid format for TF_REATTACH_PROVIDERS: %w", err)
-	}
-	if len(m) != 1 {
-		return nil, fmt.Errorf("expect only one of provider specified in the TF_REATTACH_PROVIDERS, got=%d", len(m))
-	}
-
-	var c reattachConfig
-	var p string
-	for k, v := range m {
-		c = v
-		p = k
-	}
-
-	var addr net.Addr
-	switch c.Addr.Network {
-	case "unix":
-		addr, err = net.ResolveUnixAddr("unix", c.Addr.String)
-		if err != nil {
-			return nil, fmt.Errorf("Invalid unix socket path %q: %w", c.Addr.String, err)
-		}
-	case "tcp":
-		addr, err = net.ResolveTCPAddr("tcp", c.Addr.String)
-		if err != nil {
-			return nil, fmt.Errorf("Invalid TCP address %q: %w", c.Addr.String, err)
-		}
-	default:
-		return nil, fmt.Errorf("Unknown address type %q for %q", c.Addr.Network, p)
-	}
-	return &plugin.ReattachConfig{
-		Protocol:        plugin.Protocol(c.Protocol),
-		ProtocolVersion: c.ProtocolVersion,
-		Pid:             c.Pid,
-		Test:            c.Test,
-		Addr:            addr,
-	}, nil
 }
