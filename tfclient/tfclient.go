@@ -15,6 +15,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/magodo/terraform-client-go/tfclient/tfprotov5/tf5client"
 	"github.com/magodo/terraform-client-go/tfclient/tfprotov6/tf6client"
+	"github.com/magodo/terraform-client-go/tfclient/typ"
 	"google.golang.org/grpc"
 )
 
@@ -89,6 +90,12 @@ type Option struct {
 	// to create gRPC connections. This only affects plugins using the gRPC
 	// protocol.
 	GRPCDialOptions []grpc.DialOption
+
+	// ProviderSchema allows users to provide a pre-fetched provider schema, which saves
+	// a GetProviderSchema call during the client initialization.
+	// Tis is only used for performance sensitive scenario where multiple clients are created,
+	// but target to the same provider.
+	ProviderSchema *typ.GetProviderSchemaResponse
 }
 
 // New creates a normalized client. It spins up an un-configured provider server, whose lifecycle is managed by the client, so make sure to call the "Kill" method on exit.
@@ -99,9 +106,9 @@ func New(opts Option) (Client, error) {
 	}
 	switch v {
 	case 5:
-		return tf5client.New(c.pluginClient, c.v5client)
+		return tf5client.New(c.pluginClient, c.v5client, opts.ProviderSchema)
 	case 6:
-		return tf6client.New(c.pluginClient, c.v6client)
+		return tf6client.New(c.pluginClient, c.v6client, opts.ProviderSchema)
 	default:
 		return nil, fmt.Errorf("unsupported protocol version %d", v)
 	}

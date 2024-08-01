@@ -39,10 +39,15 @@ type Client struct {
 	configuredMu sync.Mutex
 }
 
-func New(pluginClient *plugin.Client, grpcClient tfprotov6.ProviderServer) (*Client, error) {
+func New(pluginClient *plugin.Client, grpcClient tfprotov6.ProviderServer, schema *typ.GetProviderSchemaResponse) (*Client, error) {
 	c := &Client{
 		pluginClient: pluginClient,
 		client:       grpcClient,
+	}
+
+	if schema != nil {
+		c.schemas = *schema
+		return c, nil
 	}
 
 	resp, err := grpcClient.GetProviderSchema(context.Background(), &tfprotov6.GetProviderSchemaRequest{})
