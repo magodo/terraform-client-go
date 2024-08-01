@@ -6,8 +6,14 @@ import (
 )
 
 func DynamicValue(in *tfplugin5.DynamicValue) *tfprotov5.DynamicValue {
-	return &tfprotov5.DynamicValue{
+	if in == nil {
+		return nil
+	}
+
+	resp := &tfprotov5.DynamicValue{
 		MsgPack: in.Msgpack,
 		JSON:    in.Json,
 	}
+
+	return resp
 }

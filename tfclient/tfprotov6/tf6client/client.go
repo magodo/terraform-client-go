@@ -261,6 +261,9 @@ func (c *Client) ConfigureProvider(ctx context.Context, request typ.ConfigurePro
 		Config: &tfprotov6.DynamicValue{
 			MsgPack: mp,
 		},
+		ClientCapabilities: &tfprotov6.ConfigureProviderClientCapabilities{
+			DeferralAllowed: request.ClientCapabilities.DeferralAllowed,
+		},
 	}); err != nil {
 		diags := typ.RPCErrorDiagnostics(err)
 		return nil, diags
@@ -303,6 +306,9 @@ func (c *Client) ReadResource(ctx context.Context, request typ.ReadResourceReque
 		TypeName:     request.TypeName,
 		CurrentState: &tfprotov6.DynamicValue{MsgPack: mp},
 		Private:      request.Private,
+		ClientCapabilities: &tfprotov6.ReadResourceClientCapabilities{
+			DeferralAllowed: request.ClientCapabilities.DeferralAllowed,
+		},
 	}
 
 	// The second check here is not something from terraform's implementation, should be derived from the schema drift in tfjson module.
@@ -336,6 +342,7 @@ func (c *Client) ReadResource(ctx context.Context, request typ.ReadResourceReque
 	return &typ.ReadResourceResponse{
 		NewState: state,
 		Private:  resp.Private,
+		Deferred: convert.ProtoToDeferred(resp.Deferred),
 	}, diags
 }
 
@@ -386,11 +393,19 @@ func (c *Client) PlanResourceChange(ctx context.Context, request typ.PlanResourc
 		Config:           &tfprotov6.DynamicValue{MsgPack: configMP},
 		ProposedNewState: &tfprotov6.DynamicValue{MsgPack: propMP},
 		PriorPrivate:     request.PriorPrivate,
+		ClientCapabilities: &tfprotov6.PlanResourceChangeClientCapabilities{
+			DeferralAllowed: request.ClientCapabilities.DeferralAllowed,
+		},
 	}
 
 	// The second check here is not something from terraform's implementation, should be derived from the schema drift in tfjson module.
 	if metaSchema.Block != nil && len(metaSchema.Block.NestedBlocks)+len(metaSchema.Block.Attributes) != 0 {
-		metaMP, err := msgpack.Marshal(request.ProviderMeta, configschema.SchemaBlockImpliedType(resSchema.Block))
+		metaTy := configschema.SchemaBlockImpliedType(metaSchema.Block)
+		metaVal := request.ProviderMeta
+		if metaVal == cty.NilVal {
+			metaVal = cty.NullVal(metaTy)
+		}
+		metaMP, err := msgpack.Marshal(metaVal, metaTy)
 		if err != nil {
 			diags = append(diags, typ.ErrorDiagnostics("msgpack marshal", err)...)
 			return nil, diags
@@ -423,6 +438,8 @@ func (c *Client) PlanResourceChange(ctx context.Context, request typ.PlanResourc
 	response.PlannedPrivate = protoResp.PlannedPrivate
 
 	response.LegacyTypeSystem = protoResp.UnsafeToUseLegacyTypeSystem
+
+	response.Deferred = convert.ProtoToDeferred(protoResp.Deferred)
 
 	return &response, diags
 }
@@ -465,7 +482,12 @@ func (c *Client) ApplyResourceChange(ctx context.Context, request typ.ApplyResou
 
 	// The second check here is not something from terraform's implementation, should be derived from the schema drift in tfjson module.
 	if metaSchema.Block != nil && len(metaSchema.Block.NestedBlocks)+len(metaSchema.Block.Attributes) != 0 {
-		metaMP, err := msgpack.Marshal(request.ProviderMeta, configschema.SchemaBlockImpliedType(metaSchema.Block))
+		metaTy := configschema.SchemaBlockImpliedType(metaSchema.Block)
+		metaVal := request.ProviderMeta
+		if metaVal == cty.NilVal {
+			metaVal = cty.NullVal(metaTy)
+		}
+		metaMP, err := msgpack.Marshal(metaVal, metaTy)
 		if err != nil {
 			diags = append(diags, typ.ErrorDiagnostics("msgpack marshal", err)...)
 			return nil, diags
@@ -504,6 +526,9 @@ func (c *Client) ImportResourceState(ctx context.Context, request typ.ImportReso
 	resp, err := c.client.ImportResourceState(ctx, &tfprotov6.ImportResourceStateRequest{
 		TypeName: request.TypeName,
 		ID:       request.ID,
+		ClientCapabilities: &tfprotov6.ImportResourceStateClientCapabilities{
+			DeferralAllowed: request.ClientCapabilities.DeferralAllowed,
+		},
 	})
 	if err != nil {
 		return nil, typ.RPCErrorDiagnostics(err)
@@ -516,6 +541,7 @@ func (c *Client) ImportResourceState(ctx context.Context, request typ.ImportReso
 	}
 
 	var response typ.ImportResourceStateResponse
+	response.Deferred = convert.ProtoToDeferred(resp.Deferred)
 	for _, imported := range resp.ImportedResources {
 		resource := typ.ImportedResource{
 			TypeName: imported.TypeName,
@@ -562,6 +588,9 @@ func (c *Client) ReadDataSource(ctx context.Context, request typ.ReadDataSourceR
 	protoReq := &tfprotov6.ReadDataSourceRequest{
 		TypeName: request.TypeName,
 		Config:   &tfprotov6.DynamicValue{MsgPack: mp},
+		ClientCapabilities: &tfprotov6.ReadDataSourceClientCapabilities{
+			DeferralAllowed: request.ClientCapabilities.DeferralAllowed,
+		},
 	}
 
 	// The second check here is not something from terraform's implementation, should be derived from the schema drift in tfjson module.
@@ -593,7 +622,8 @@ func (c *Client) ReadDataSource(ctx context.Context, request typ.ReadDataSourceR
 	}
 
 	return &typ.ReadDataSourceResponse{
-		State: state,
+		State:    state,
+		Deferred: convert.ProtoToDeferred(resp.Deferred),
 	}, diags
 }
 

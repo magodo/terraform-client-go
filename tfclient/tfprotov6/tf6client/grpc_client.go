@@ -18,10 +18,7 @@ var _ tfprotov6.ProviderServer = &GRPCClient{}
 
 // ApplyResourceChange implements tfprotov6.ProviderServer
 func (c *GRPCClient) ApplyResourceChange(ctx context.Context, req *tfprotov6.ApplyResourceChangeRequest) (*tfprotov6.ApplyResourceChangeResponse, error) {
-	r, err := toproto.ApplyResourceChange_Request(req)
-	if err != nil {
-		return nil, err
-	}
+	r := toproto.ApplyResourceChange_Request(req)
 	resp, err := c.client.ApplyResourceChange(ctx, r)
 	if err != nil {
 		return nil, err
@@ -35,10 +32,7 @@ func (c *GRPCClient) ApplyResourceChange(ctx context.Context, req *tfprotov6.App
 
 // ImportResourceState implements tfprotov6.ProviderServer
 func (c *GRPCClient) ImportResourceState(ctx context.Context, req *tfprotov6.ImportResourceStateRequest) (*tfprotov6.ImportResourceStateResponse, error) {
-	r, err := toproto.ImportResourceState_Request(req)
-	if err != nil {
-		return nil, err
-	}
+	r := toproto.ImportResourceState_Request(req)
 	resp, err := c.client.ImportResourceState(ctx, r)
 	if err != nil {
 		return nil, err
@@ -52,10 +46,7 @@ func (c *GRPCClient) ImportResourceState(ctx context.Context, req *tfprotov6.Imp
 
 // PlanResourceChange implements tfprotov6.ProviderServer
 func (c *GRPCClient) PlanResourceChange(ctx context.Context, req *tfprotov6.PlanResourceChangeRequest) (*tfprotov6.PlanResourceChangeResponse, error) {
-	r, err := toproto.PlanResourceChange_Request(req)
-	if err != nil {
-		return nil, err
-	}
+	r := toproto.PlanResourceChange_Request(req)
 	resp, err := c.client.PlanResourceChange(ctx, r)
 	if err != nil {
 		return nil, err
@@ -69,10 +60,7 @@ func (c *GRPCClient) PlanResourceChange(ctx context.Context, req *tfprotov6.Plan
 
 // ReadResource implements tfprotov6.ProviderServer
 func (c *GRPCClient) ReadResource(ctx context.Context, req *tfprotov6.ReadResourceRequest) (*tfprotov6.ReadResourceResponse, error) {
-	r, err := toproto.ReadResource_Request(req)
-	if err != nil {
-		return nil, err
-	}
+	r := toproto.ReadResource_Request(req)
 	resp, err := c.client.ReadResource(ctx, r)
 	if err != nil {
 		return nil, err
@@ -86,10 +74,7 @@ func (c *GRPCClient) ReadResource(ctx context.Context, req *tfprotov6.ReadResour
 
 // UpgradeResourceState implements tfprotov6.ProviderServer
 func (c *GRPCClient) UpgradeResourceState(ctx context.Context, req *tfprotov6.UpgradeResourceStateRequest) (*tfprotov6.UpgradeResourceStateResponse, error) {
-	r, err := toproto.UpgradeResourceState_Request(req)
-	if err != nil {
-		return nil, err
-	}
+	r := toproto.UpgradeResourceState_Request(req)
 	resp, err := c.client.UpgradeResourceState(ctx, r)
 	if err != nil {
 		return nil, err
@@ -103,10 +88,7 @@ func (c *GRPCClient) UpgradeResourceState(ctx context.Context, req *tfprotov6.Up
 
 // ValidateResourceConfig implements tfprotov6.ProviderServer
 func (c *GRPCClient) ValidateResourceConfig(ctx context.Context, req *tfprotov6.ValidateResourceConfigRequest) (*tfprotov6.ValidateResourceConfigResponse, error) {
-	r, err := toproto.ValidateResourceConfig_Request(req)
-	if err != nil {
-		return nil, err
-	}
+	r := toproto.ValidateResourceConfig_Request(req)
 	resp, err := c.client.ValidateResourceConfig(ctx, r)
 	if err != nil {
 		return nil, err
@@ -120,10 +102,7 @@ func (c *GRPCClient) ValidateResourceConfig(ctx context.Context, req *tfprotov6.
 
 // ReadDataSource implements tfprotov6.ProviderServer
 func (c *GRPCClient) ReadDataSource(ctx context.Context, req *tfprotov6.ReadDataSourceRequest) (*tfprotov6.ReadDataSourceResponse, error) {
-	r, err := toproto.ReadDataSource_Request(req)
-	if err != nil {
-		return nil, err
-	}
+	r := toproto.ReadDataSource_Request(req)
 	resp, err := c.client.ReadDataSource(ctx, r)
 	if err != nil {
 		return nil, err
@@ -137,10 +116,7 @@ func (c *GRPCClient) ReadDataSource(ctx context.Context, req *tfprotov6.ReadData
 
 // ValidateDataResourceConfig implements tfprotov6.ProviderServer
 func (c *GRPCClient) ValidateDataResourceConfig(ctx context.Context, req *tfprotov6.ValidateDataResourceConfigRequest) (*tfprotov6.ValidateDataResourceConfigResponse, error) {
-	r, err := toproto.ValidateDataResourceConfig_Request(req)
-	if err != nil {
-		return nil, err
-	}
+	r := toproto.ValidateDataResourceConfig_Request(req)
 	resp, err := c.client.ValidateDataResourceConfig(ctx, r)
 	if err != nil {
 		return nil, err
@@ -154,10 +130,7 @@ func (c *GRPCClient) ValidateDataResourceConfig(ctx context.Context, req *tfprot
 
 // ConfigureProvider implements tfprotov6.ProviderServer
 func (c *GRPCClient) ConfigureProvider(ctx context.Context, req *tfprotov6.ConfigureProviderRequest) (*tfprotov6.ConfigureProviderResponse, error) {
-	r, err := toproto.Configure_Request(req)
-	if err != nil {
-		return nil, err
-	}
+	r := toproto.ConfigureProvider_Request(req)
 	resp, err := c.client.ConfigureProvider(ctx, r)
 	if err != nil {
 		return nil, err
@@ -171,10 +144,7 @@ func (c *GRPCClient) ConfigureProvider(ctx context.Context, req *tfprotov6.Confi
 
 // GetProviderSchema implements tfprotov6.ProviderServer
 func (c *GRPCClient) GetProviderSchema(ctx context.Context, req *tfprotov6.GetProviderSchemaRequest) (*tfprotov6.GetProviderSchemaResponse, error) {
-	r, err := toproto.GetProviderSchema_Request(req)
-	if err != nil {
-		return nil, err
-	}
+	r := toproto.GetProviderSchema_Request(req)
 	resp, err := c.client.GetProviderSchema(ctx, r)
 	if err != nil {
 		return nil, err
@@ -188,10 +158,7 @@ func (c *GRPCClient) GetProviderSchema(ctx context.Context, req *tfprotov6.GetPr
 
 // StopProvider implements tfprotov6.ProviderServer
 func (c *GRPCClient) StopProvider(ctx context.Context, req *tfprotov6.StopProviderRequest) (*tfprotov6.StopProviderResponse, error) {
-	r, err := toproto.Stop_Request(req)
-	if err != nil {
-		return nil, err
-	}
+	r := toproto.StopProvider_Request(req)
 	resp, err := c.client.StopProvider(ctx, r)
 	if err != nil {
 		return nil, err
@@ -205,15 +172,61 @@ func (c *GRPCClient) StopProvider(ctx context.Context, req *tfprotov6.StopProvid
 
 // ValidateProviderConfig implements tfprotov6.ProviderServer
 func (c *GRPCClient) ValidateProviderConfig(ctx context.Context, req *tfprotov6.ValidateProviderConfigRequest) (*tfprotov6.ValidateProviderConfigResponse, error) {
-	r, err := toproto.ValidateProviderConfig_Request(req)
-	if err != nil {
-		return nil, err
-	}
+	r := toproto.ValidateProviderConfig_Request(req)
 	resp, err := c.client.ValidateProviderConfig(ctx, r)
 	if err != nil {
 		return nil, err
 	}
 	ret, err := fromproto.ValidateProviderConfigResponse(resp)
+	if err != nil {
+		return nil, err
+	}
+	return ret, nil
+}
+
+func (c *GRPCClient) CallFunction(ctx context.Context, req *tfprotov6.CallFunctionRequest) (*tfprotov6.CallFunctionResponse, error) {
+	r := toproto.CallFunction_Request(req)
+	resp, err := c.client.CallFunction(ctx, r)
+	if err != nil {
+		return nil, err
+	}
+	ret := fromproto.CallFunctionResponse(resp)
+	return ret, nil
+}
+
+func (c *GRPCClient) GetFunctions(ctx context.Context, req *tfprotov6.GetFunctionsRequest) (*tfprotov6.GetFunctionsResponse, error) {
+	r := toproto.GetFunctions_Request(req)
+	resp, err := c.client.GetFunctions(ctx, r)
+	if err != nil {
+		return nil, err
+	}
+	ret, err := fromproto.GetFunctionsResponse(resp)
+	if err != nil {
+		return nil, err
+	}
+	return ret, nil
+}
+
+func (c *GRPCClient) GetMetadata(ctx context.Context, req *tfprotov6.GetMetadataRequest) (*tfprotov6.GetMetadataResponse, error) {
+	r := toproto.GetMetadata_Request(req)
+	resp, err := c.client.GetMetadata(ctx, r)
+	if err != nil {
+		return nil, err
+	}
+	ret, err := fromproto.GetMetadataResponse(resp)
+	if err != nil {
+		return nil, err
+	}
+	return ret, nil
+}
+
+func (c *GRPCClient) MoveResourceState(ctx context.Context, req *tfprotov6.MoveResourceStateRequest) (*tfprotov6.MoveResourceStateResponse, error) {
+	r := toproto.MoveResourceState_Request(req)
+	resp, err := c.client.MoveResourceState(ctx, r)
+	if err != nil {
+		return nil, err
+	}
+	ret, err := fromproto.MoveResourceStateResponse(resp)
 	if err != nil {
 		return nil, err
 	}

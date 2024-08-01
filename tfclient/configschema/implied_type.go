@@ -1,3 +1,5 @@
+// This is derived from github.com/hashicorp/terraform/internal/configs/configschema/implied_type.go (c395d90b375e2b230384d0c213fe26a06b76222b)
+
 package configschema
 
 import (

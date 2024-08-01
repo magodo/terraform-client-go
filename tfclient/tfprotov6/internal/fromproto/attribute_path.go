@@ -2,9 +2,9 @@ package fromproto
 
 import (
 	"errors"
-	"github.com/magodo/terraform-client-go/tfclient/tfprotov6/internal/tfplugin6"
 
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
+	"github.com/magodo/terraform-client-go/tfclient/tfprotov6/internal/tfplugin6"
 )
 
 var ErrUnknownAttributePathStepType = errors.New("unknown type of AttributePath_Step")

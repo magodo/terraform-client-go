@@ -2,10 +2,10 @@ package fromproto
 
 import (
 	"fmt"
-	"github.com/magodo/terraform-client-go/tfclient/tfprotov5/internal/tfplugin5"
 
 	"github.com/hashicorp/terraform-plugin-go/tfprotov5"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
+	"github.com/magodo/terraform-client-go/tfclient/tfprotov5/internal/tfplugin5"
 )
 
 func Schema(in *tfplugin5.Schema) (*tfprotov5.Schema, error) {

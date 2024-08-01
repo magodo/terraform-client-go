@@ -4,7 +4,6 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/apparentlymart/go-dump/dump"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/google/go-cmp/cmp"
 
@@ -12,6 +11,7 @@ import (
 	"github.com/hashicorp/hcl/v2/hcldec"
 	"github.com/hashicorp/hcl/v2/hcltest"
 	tfjson "github.com/hashicorp/terraform-json"
+	"github.com/zclconf/go-cty-debug/ctydebug"
 	"github.com/zclconf/go-cty/cty"
 )
 
@@ -408,9 +408,11 @@ func TestBlockDecoderSpec(t *testing.T) {
 				}
 			}
 
-			if !got.RawEquals(test.Want) {
+			if diff := cmp.Diff(test.Want, got, ctydebug.CmpOptions); diff != "" {
 				t.Logf("[INFO] implied schema is %s", spew.Sdump(hcldec.ImpliedSchema(spec)))
-				t.Errorf("wrong result\ngot:  %s\nwant: %s", dump.Value(got), dump.Value(test.Want))
+				t.Errorf("wrong result\n%s", diff)
+			}
+			if !got.RawEquals(test.Want) {
 			}
 
 			// Double-check that we're producing consistent results for DecoderSpec
@@ -444,18 +446,6 @@ func TestSchemaAttributeDecoderSpec(t *testing.T) {
 		Want      cty.Value
 		DiagCount int
 	}{
-		"empty": {
-			&tfjson.SchemaAttribute{},
-			hcl.EmptyBody(),
-			cty.NilVal,
-			0,
-		},
-		"nil": {
-			nil,
-			hcl.EmptyBody(),
-			cty.NilVal,
-			0,
-		},
 		"optional string (null)": {
 			&tfjson.SchemaAttribute{
 				AttributeType: cty.String,
@@ -863,9 +853,9 @@ func TestSchemaAttributeDecoderSpec(t *testing.T) {
 				}
 			}
 
-			if !got.RawEquals(test.Want) {
+			if diff := cmp.Diff(test.Want, got, ctydebug.CmpOptions); diff != "" {
 				t.Logf("[INFO] implied schema is %s", spew.Sdump(hcldec.ImpliedSchema(spec)))
-				t.Errorf("wrong result\ngot:  %s\nwant: %s", dump.Value(got), dump.Value(test.Want))
+				t.Errorf("wrong result\n%s", diff)
 			}
 		})
 	}
@@ -873,17 +863,33 @@ func TestSchemaAttributeDecoderSpec(t *testing.T) {
 
 // Mimic TestAttributeDecoderSpec_panic
 func TestSchemaAttributeDecoderSpec_panic(t *testing.T) {
-	attrS := &tfjson.SchemaAttribute{
-		AttributeType: cty.Object(map[string]cty.Type{
-			"nested_attribute": cty.String,
-		}),
-		AttributeNestedType: &tfjson.SchemaNestedAttributeType{},
-		Optional:            true,
+	tests := map[string]struct {
+		Schema *tfjson.SchemaAttribute
+	}{
+		"empty": {
+			Schema: &tfjson.SchemaAttribute{},
+		},
+		"nil": {
+			Schema: nil,
+		},
+		"nested_attribute": {
+			Schema: &tfjson.SchemaAttribute{
+				AttributeType: cty.Object(map[string]cty.Type{
+					"nested_attribute": cty.String,
+				}),
+				AttributeNestedType: &tfjson.SchemaNestedAttributeType{},
+				Optional:            true,
+			},
+		},
 	}
 
-	defer func() { recover() }()
-	decoderSpec(attrS, "attr")
-	t.Errorf("expected panic")
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			defer func() { recover() }()
+			decoderSpec(test.Schema, "attr")
+			t.Errorf("expected panic")
+		})
+	}
 }
 
 // Mimic TestListOptionalAttrsFromObject
