@@ -62,6 +62,7 @@ func New(pluginClient *plugin.Client, grpcClient tfprotov6.ProviderServer, schem
 	schemas := typ.GetProviderSchemaResponse{
 		ResourceTypes: map[string]tfjson.Schema{},
 		DataSources:   map[string]tfjson.Schema{},
+		Functions:     map[string]typ.FunctionDecl{},
 		ServerCapabilities: typ.ServerCapabilities{
 			PlanDestroy: false,
 		},
@@ -80,6 +81,12 @@ func New(pluginClient *plugin.Client, grpcClient tfprotov6.ProviderServer, schem
 	}
 	for name, schema := range resp.DataSourceSchemas {
 		schemas.DataSources[name] = convert.ProtoToProviderSchema(schema)
+	}
+	for name, fun := range resp.Functions {
+		schemas.Functions[name], err = convert.FunctionDeclFromProto(fun)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	c.schemas = schemas

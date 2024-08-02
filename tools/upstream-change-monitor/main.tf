@@ -87,9 +87,11 @@ locals {
     "internal/configs/configschema/implied_type.go",
     "internal/plugin/convert/schema.go",
     "internal/plugin/convert/deferred.go",
+    "internal/plugin/convert/functions.go",
     "internal/plugin/grpc_provider.go",
     "internal/plugin6/convert/schema.go",
     "internal/plugin6/convert/deferred.go",
+    "internal/plugin6/convert/functions.go",
     "internal/plugin6/grpc_provider.go",
   ])
 }
