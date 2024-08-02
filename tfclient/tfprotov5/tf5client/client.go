@@ -1,4 +1,4 @@
-// This is derived from github.com/hashicorp/terraform/internal/plugin/grpc_provider.go (15ecdb66c84cd8202b0ae3d34c44cb4bbece5444)
+// This is derived from github.com/hashicorp/terraform/internal/plugin/grpc_provider.go
 
 package tf5client
 
@@ -15,6 +15,7 @@ import (
 	"github.com/magodo/terraform-client-go/tfclient/tfprotov5/convert"
 	"github.com/magodo/terraform-client-go/tfclient/typ"
 	"github.com/zclconf/go-cty/cty"
+	"github.com/zclconf/go-cty/cty/function"
 	ctyjson "github.com/zclconf/go-cty/cty/json"
 	"github.com/zclconf/go-cty/cty/msgpack"
 )
@@ -577,6 +578,44 @@ func (c *Client) ImportResourceState(ctx context.Context, request typ.ImportReso
 	return &response, diags
 }
 
+func (c *Client) MoveResourceState(ctx context.Context, request typ.MoveResourceStateRequest) (*typ.MoveResourceStateResponse, typ.Diagnostics) {
+	var diags typ.Diagnostics
+
+	protoReq := &tfprotov5.MoveResourceStateRequest{
+		SourceProviderAddress: request.SourceProviderAddress,
+		SourceTypeName:        request.SourceTypeName,
+		SourceSchemaVersion:   request.SourceSchemaVersion,
+		SourceState: &tfprotov5.RawState{
+			JSON: request.SourceStateJSON,
+		},
+		SourcePrivate:  request.SourcePrivate,
+		TargetTypeName: request.TargetTypeName,
+	}
+
+	protoResp, err := c.client.MoveResourceState(ctx, protoReq)
+	if err != nil {
+		return nil, typ.RPCErrorDiagnostics(err)
+	}
+
+	schema := c.schemas
+	targetType, ok := schema.ResourceTypes[request.TargetTypeName]
+	if !ok {
+		diags = append(diags, typ.ErrorDiagnostics("no schema", fmt.Errorf("unknown resource type %q", request.TargetTypeName))...)
+		return nil, diags
+	}
+
+	state, err := decodeDynamicValue(protoResp.TargetState, configschema.SchemaBlockImpliedType(targetType.Block))
+	if err != nil {
+		diags = append(diags, typ.ErrorDiagnostics("decode dynamic value", err)...)
+		return nil, diags
+	}
+
+	return &typ.MoveResourceStateResponse{
+		TargetState:   state,
+		TargetPrivate: protoResp.TargetPrivate,
+	}, nil
+}
+
 func (c *Client) ReadDataSource(ctx context.Context, request typ.ReadDataSourceRequest) (*typ.ReadDataSourceResponse, typ.Diagnostics) {
 	var diags typ.Diagnostics
 	schema := c.schemas
@@ -635,6 +674,74 @@ func (c *Client) ReadDataSource(ctx context.Context, request typ.ReadDataSourceR
 		State:    state,
 		Deferred: convert.ProtoToDeferred(resp.Deferred),
 	}, diags
+}
+
+func (c *Client) CallFunction(ctx context.Context, request typ.CallFunctionRequest) (*typ.CallFunctionResponse, typ.Diagnostics) {
+	var diags typ.Diagnostics
+	schema := c.schemas
+
+	funcDecl, ok := schema.Functions[request.FunctionName]
+	if !ok {
+		diags = append(diags, typ.ErrorDiagnostics("no schema", fmt.Errorf("unknown function name type %q", request.FunctionName))...)
+		return nil, diags
+	}
+	if len(request.Arguments) < len(funcDecl.Parameters) {
+		diags = append(diags, typ.ErrorDiagnostics("call function error", fmt.Errorf("not enough arguments for function %q", request.FunctionName))...)
+		return nil, diags
+	}
+	if funcDecl.VariadicParameter == nil && len(request.Arguments) > len(funcDecl.Parameters) {
+		diags = append(diags, typ.ErrorDiagnostics("call function error", fmt.Errorf("too many arguments for function %q", request.FunctionName))...)
+		return nil, diags
+	}
+	args := make([]*tfprotov5.DynamicValue, len(request.Arguments))
+	for i, argVal := range request.Arguments {
+		var paramDecl typ.FunctionParam
+		if i < len(funcDecl.Parameters) {
+			paramDecl = funcDecl.Parameters[i]
+		} else {
+			paramDecl = *funcDecl.VariadicParameter
+		}
+
+		argValRaw, err := msgpack.Marshal(argVal, paramDecl.Type)
+		if err != nil {
+			diags = append(diags, typ.ErrorDiagnostics("call function error", fmt.Errorf("marshal argument: %v", err))...)
+			return nil, diags
+		}
+		args[i] = &tfprotov5.DynamicValue{
+			MsgPack: argValRaw,
+		}
+	}
+
+	protoResp, err := c.client.CallFunction(ctx, &tfprotov5.CallFunctionRequest{
+		Name:      request.FunctionName,
+		Arguments: args,
+	})
+	if err != nil {
+		diags = append(diags, typ.RPCErrorDiagnostics(err)...)
+		return nil, diags
+	}
+
+	resp := &typ.CallFunctionResponse{}
+
+	if protoResp.Error != nil {
+		resp.Err = errors.New(protoResp.Error.Text)
+
+		// If this is a problem with a specific argument, we can wrap the error
+		// in a function.ArgError
+		if protoResp.Error.FunctionArgument != nil {
+			resp.Err = function.NewArgError(int(*protoResp.Error.FunctionArgument), resp.Err)
+		}
+
+		return resp, nil
+	}
+
+	resultVal, err := decodeDynamicValue(protoResp.Result, funcDecl.ReturnType)
+	if err != nil {
+		diags = append(diags, typ.ErrorDiagnostics("call function error", fmt.Errorf("decoding return value: %v", err))...)
+		return nil, diags
+	}
+	resp.Result = resultVal
+	return resp, nil
 }
 
 func (c *Client) Close() {

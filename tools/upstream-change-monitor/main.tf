@@ -78,15 +78,18 @@ locals {
     "tfprotov6/internal/toproto/state.go",
     "tfprotov6/internal/toproto/string_kind.go",
   ])
-  terraform-commit = "c395d90b375e2b230384d0c213fe26a06b76222b"
+  terraform-commit = "v1.10.0-alpha20240730"
   terraform = toset([
     "internal/providers/provider.go",
+    "internal/providers/functions.go",
     "internal/configs/configschema/decoder_spec.go",
     "internal/configs/configschema/empty_value.go",
     "internal/configs/configschema/implied_type.go",
     "internal/plugin/convert/schema.go",
+    "internal/plugin/convert/deferred.go",
     "internal/plugin/grpc_provider.go",
     "internal/plugin6/convert/schema.go",
+    "internal/plugin6/convert/deferred.go",
     "internal/plugin6/grpc_provider.go",
   ])
 }

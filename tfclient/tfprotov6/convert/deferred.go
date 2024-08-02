@@ -1,3 +1,5 @@
+// Duplicating the logic from: github.com/hashicorp/terraform/internal/plugin6/convert/deferred.go
+
 package convert
 
 import (

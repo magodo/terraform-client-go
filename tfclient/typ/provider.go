@@ -1,4 +1,4 @@
-// This is derived from github.com/hashicorp/terraform/internal/providers/provider.go (15ecdb66c84cd8202b0ae3d34c44cb4bbece5444)
+// This is derived from github.com/hashicorp/terraform/internal/providers/provider.go
 
 package typ
 
@@ -20,7 +20,9 @@ type GetProviderSchemaResponse struct {
 	// DataSources maps the data source name to that data source's schema.
 	DataSources map[string]tfjson.Schema
 
-	// TODO: Functions
+	// Functions maps from local function name (not including an namespace
+	// prefix) to the declaration of a function.
+	Functions map[string]FunctionDecl
 
 	// ServerCapabilities lists optional features supported by the provider.
 	ServerCapabilities ServerCapabilities

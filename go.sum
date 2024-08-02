@@ -34,8 +34,8 @@ github.com/hashicorp/go-version v1.6.0 h1:feTTfFNnjP967rlCxM/I9g701jU+RN74YKx2mO
 github.com/hashicorp/go-version v1.6.0/go.mod h1:fltr4n8CU8Ke44wwGCBoEymUuxUHl09ZGVZPK5anwXA=
 github.com/hashicorp/hcl/v2 v2.11.1 h1:yTyWcXcm9XB0TEkyU/JCRU6rYy4K+mgLtzn2wlrJbcc=
 github.com/hashicorp/hcl/v2 v2.11.1/go.mod h1:FwWsfWEjyV/CMj8s/gqAuiviY72rJ1/oayI9WftqcKg=
-github.com/hashicorp/terraform-json v0.16.0 h1:UKkeWRWb23do5LNAFlh/K3N0ymn1qTOO8c+85Albo3s=
-github.com/hashicorp/terraform-json v0.16.0/go.mod h1:v0Ufk9jJnk6tcIZvScHvetlKfiNTC+WS21mnXIlc0B0=
+github.com/hashicorp/terraform-json v0.22.1 h1:xft84GZR0QzjPVWs4lRUwvTcPnegqlyS7orfb5Ltvec=
+github.com/hashicorp/terraform-json v0.22.1/go.mod h1:JbWSQCLFSXFFhg42T7l9iJwdGXBYV8fmmD6o/ML4p3A=
 github.com/hashicorp/terraform-plugin-go v0.23.0 h1:AALVuU1gD1kPb48aPQUjug9Ir/125t+AAurhqphJ2Co=
 github.com/hashicorp/terraform-plugin-go v0.23.0/go.mod h1:1E3Cr9h2vMlahWMbsSEcNrOCxovCZhOOIXjFHbjc/lQ=
 github.com/hashicorp/yamux v0.1.1 h1:yrQxtgseBDrq9Y652vSRDvsKCJKOUD+GzTS4Y0Y8pvE=
@@ -81,8 +81,8 @@ github.com/vmihailenco/tagparser/v2 v2.0.0 h1:y09buUbR+b5aycVFQs/g70pqKVZNBmxwAh
 github.com/vmihailenco/tagparser/v2 v2.0.0/go.mod h1:Wri+At7QHww0WTrCBeu4J6bNtoV6mEfg5OIWRZA9qds=
 github.com/zclconf/go-cty v1.2.0/go.mod h1:hOPWgoHbaTUnI5k4D2ld+GRpFJSCe6bCM7m1q/N4PQ8=
 github.com/zclconf/go-cty v1.8.0/go.mod h1:vVKLxnk3puL4qRAv72AO+W99LUD4da90g3uUAzyuvAk=
-github.com/zclconf/go-cty v1.14.3 h1:1JXy1XroaGrzZuG6X9dt7HL6s9AwbY+l4UNL8o5B6ho=
-github.com/zclconf/go-cty v1.14.3/go.mod h1:VvMs5i0vgZdhYawQNq5kePSpLAoz8u1xvZgrPIxfnZE=
+github.com/zclconf/go-cty v1.14.4 h1:uXXczd9QDGsgu0i/QFR/hzI5NYCHLf6NQw/atrbnhq8=
+github.com/zclconf/go-cty v1.14.4/go.mod h1:VvMs5i0vgZdhYawQNq5kePSpLAoz8u1xvZgrPIxfnZE=
 github.com/zclconf/go-cty-debug v0.0.0-20191215020915-b22d67c1ba0b/go.mod h1:ZRKQfBXbGkpdV6QMzT3rU1kSTAnfu1dO8dPKjYprgj8=
 github.com/zclconf/go-cty-debug v0.0.0-20240209213017-b8d9e32151be h1:JoF5rruXECi+VEbdJ6xanklyLnz+TVCZ0FcmvSQq/Go=
 github.com/zclconf/go-cty-debug v0.0.0-20240209213017-b8d9e32151be/go.mod h1:CmBdvvj3nqzfzJ6nTCIwDTPZ56aVGvDrmztiO5g3qrM=

@@ -4,6 +4,7 @@ package tfclient
 
 import (
 	"context"
+
 	"github.com/magodo/terraform-client-go/tfclient/typ"
 )
 
@@ -63,8 +64,15 @@ type Client interface {
 	// ImportResourceState requests that the given resource be imported.
 	ImportResourceState(context.Context, typ.ImportResourceStateRequest) (*typ.ImportResourceStateResponse, typ.Diagnostics)
 
+	// MoveResourceState retrieves the updated value for a resource after it
+	// has moved resource types.
+	MoveResourceState(context.Context, typ.MoveResourceStateRequest) (*typ.MoveResourceStateResponse, typ.Diagnostics)
+
 	// ReadDataSource returns the data source's current state.
 	ReadDataSource(context.Context, typ.ReadDataSourceRequest) (*typ.ReadDataSourceResponse, typ.Diagnostics)
+
+	// CallFunction calls a provider-contributed function.
+	CallFunction(context.Context, typ.CallFunctionRequest) (*typ.CallFunctionResponse, typ.Diagnostics)
 
 	// Close shuts down the plugin process if applicable.
 	Close()

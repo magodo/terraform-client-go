@@ -12,9 +12,9 @@ require (
 	github.com/hashicorp/go-hclog v1.5.0
 	github.com/hashicorp/go-plugin v1.6.0
 	github.com/hashicorp/hcl/v2 v2.11.1
-	github.com/hashicorp/terraform-json v0.16.0
+	github.com/hashicorp/terraform-json v0.22.1
 	github.com/hashicorp/terraform-plugin-go v0.23.0
-	github.com/zclconf/go-cty v1.14.3
+	github.com/zclconf/go-cty v1.14.4
 	github.com/zclconf/go-cty-debug v0.0.0-20240209213017-b8d9e32151be
 	google.golang.org/grpc v1.65.0
 	google.golang.org/protobuf v1.34.2
