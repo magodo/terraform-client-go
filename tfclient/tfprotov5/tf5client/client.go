@@ -1,4 +1,4 @@
-// This is derived from github.com/hashicorp/terraform/internal/plugin/grpc_provider.go (15ecdb66c84cd8202b0ae3d34c44cb4bbece5444)
+// This is derived from github.com/hashicorp/terraform/internal/plugin/grpc_provider.go
 
 package tf5client
 
@@ -15,6 +15,7 @@ import (
 	"github.com/magodo/terraform-client-go/tfclient/tfprotov5/convert"
 	"github.com/magodo/terraform-client-go/tfclient/typ"
 	"github.com/zclconf/go-cty/cty"
+	"github.com/zclconf/go-cty/cty/function"
 	ctyjson "github.com/zclconf/go-cty/cty/json"
 	"github.com/zclconf/go-cty/cty/msgpack"
 )
@@ -59,13 +60,18 @@ func New(pluginClient *plugin.Client, grpcClient tfprotov5.ProviderServer, schem
 	}
 
 	schemas := typ.GetProviderSchemaResponse{
-		Provider:      convert.ProtoToProviderSchema(resp.Provider),
-		ProviderMeta:  convert.ProtoToProviderSchema(resp.ProviderMeta),
 		ResourceTypes: map[string]tfjson.Schema{},
 		DataSources:   map[string]tfjson.Schema{},
+		Functions:     map[string]typ.FunctionDecl{},
 		ServerCapabilities: typ.ServerCapabilities{
 			PlanDestroy: false,
 		},
+	}
+	if resp.Provider != nil {
+		schemas.Provider = convert.ProtoToProviderSchema(resp.Provider)
+	}
+	if resp.ProviderMeta != nil {
+		schemas.ProviderMeta = convert.ProtoToProviderSchema(resp.ProviderMeta)
 	}
 	if resp.ServerCapabilities != nil {
 		schemas.ServerCapabilities.PlanDestroy = resp.ServerCapabilities.PlanDestroy
@@ -75,6 +81,12 @@ func New(pluginClient *plugin.Client, grpcClient tfprotov5.ProviderServer, schem
 	}
 	for name, schema := range resp.DataSourceSchemas {
 		schemas.DataSources[name] = convert.ProtoToProviderSchema(schema)
+	}
+	for name, fun := range resp.Functions {
+		schemas.Functions[name], err = convert.FunctionDeclFromProto(fun)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	c.schemas = schemas
@@ -263,6 +275,9 @@ func (c *Client) ConfigureProvider(ctx context.Context, request typ.ConfigurePro
 		Config: &tfprotov5.DynamicValue{
 			MsgPack: mp,
 		},
+		ClientCapabilities: &tfprotov5.ConfigureProviderClientCapabilities{
+			DeferralAllowed: request.ClientCapabilities.DeferralAllowed,
+		},
 	})
 	if err != nil {
 		diags := typ.RPCErrorDiagnostics(err)
@@ -314,6 +329,9 @@ func (c *Client) ReadResource(ctx context.Context, request typ.ReadResourceReque
 		TypeName:     request.TypeName,
 		CurrentState: &tfprotov5.DynamicValue{MsgPack: mp},
 		Private:      request.Private,
+		ClientCapabilities: &tfprotov5.ReadResourceClientCapabilities{
+			DeferralAllowed: request.ClientCapabilities.DeferralAllowed,
+		},
 	}
 
 	// The second check here is not something from terraform's implementation, should be derived from the schema drift in tfjson module.
@@ -347,6 +365,7 @@ func (c *Client) ReadResource(ctx context.Context, request typ.ReadResourceReque
 	return &typ.ReadResourceResponse{
 		NewState: state,
 		Private:  resp.Private,
+		Deferred: convert.ProtoToDeferred(resp.Deferred),
 	}, diags
 }
 
@@ -397,11 +416,19 @@ func (c *Client) PlanResourceChange(ctx context.Context, request typ.PlanResourc
 		Config:           &tfprotov5.DynamicValue{MsgPack: configMP},
 		ProposedNewState: &tfprotov5.DynamicValue{MsgPack: propMP},
 		PriorPrivate:     request.PriorPrivate,
+		ClientCapabilities: &tfprotov5.PlanResourceChangeClientCapabilities{
+			DeferralAllowed: request.ClientCapabilities.DeferralAllowed,
+		},
 	}
 
 	// The second check here is not something from terraform's implementation, should be derived from the schema drift in tfjson module.
 	if metaSchema.Block != nil && len(metaSchema.Block.NestedBlocks)+len(metaSchema.Block.Attributes) != 0 {
-		metaMP, err := msgpack.Marshal(request.ProviderMeta, configschema.SchemaBlockImpliedType(resSchema.Block))
+		metaTy := configschema.SchemaBlockImpliedType(metaSchema.Block)
+		metaVal := request.ProviderMeta
+		if metaVal == cty.NilVal {
+			metaVal = cty.NullVal(metaTy)
+		}
+		metaMP, err := msgpack.Marshal(metaVal, metaTy)
 		if err != nil {
 			diags = append(diags, typ.ErrorDiagnostics("msgpack marshal", err)...)
 			return nil, diags
@@ -434,6 +461,8 @@ func (c *Client) PlanResourceChange(ctx context.Context, request typ.PlanResourc
 	response.PlannedPrivate = protoResp.PlannedPrivate
 
 	response.LegacyTypeSystem = protoResp.UnsafeToUseLegacyTypeSystem
+
+	response.Deferred = convert.ProtoToDeferred(protoResp.Deferred)
 
 	return &response, diags
 }
@@ -476,7 +505,12 @@ func (c *Client) ApplyResourceChange(ctx context.Context, request typ.ApplyResou
 
 	// The second check here is not something from terraform's implementation, should be derived from the schema drift in tfjson module.
 	if metaSchema.Block != nil && len(metaSchema.Block.NestedBlocks)+len(metaSchema.Block.Attributes) != 0 {
-		metaMP, err := msgpack.Marshal(request.ProviderMeta, configschema.SchemaBlockImpliedType(metaSchema.Block))
+		metaTy := configschema.SchemaBlockImpliedType(metaSchema.Block)
+		metaVal := request.ProviderMeta
+		if metaVal == cty.NilVal {
+			metaVal = cty.NullVal(metaTy)
+		}
+		metaMP, err := msgpack.Marshal(metaVal, metaTy)
 		if err != nil {
 			diags = append(diags, typ.ErrorDiagnostics("msgpack marshal", err)...)
 			return nil, diags
@@ -515,6 +549,9 @@ func (c *Client) ImportResourceState(ctx context.Context, request typ.ImportReso
 	resp, err := c.client.ImportResourceState(ctx, &tfprotov5.ImportResourceStateRequest{
 		TypeName: request.TypeName,
 		ID:       request.ID,
+		ClientCapabilities: &tfprotov5.ImportResourceStateClientCapabilities{
+			DeferralAllowed: request.ClientCapabilities.DeferralAllowed,
+		},
 	})
 	if err != nil {
 		return nil, typ.RPCErrorDiagnostics(err)
@@ -527,6 +564,7 @@ func (c *Client) ImportResourceState(ctx context.Context, request typ.ImportReso
 	}
 
 	var response typ.ImportResourceStateResponse
+	response.Deferred = convert.ProtoToDeferred(resp.Deferred)
 	for _, imported := range resp.ImportedResources {
 		resource := typ.ImportedResource{
 			TypeName: imported.TypeName,
@@ -546,10 +584,47 @@ func (c *Client) ImportResourceState(ctx context.Context, request typ.ImportReso
 		}
 		resource.State = state
 		response.ImportedResources = append(response.ImportedResources, resource)
-
 	}
 
 	return &response, diags
+}
+
+func (c *Client) MoveResourceState(ctx context.Context, request typ.MoveResourceStateRequest) (*typ.MoveResourceStateResponse, typ.Diagnostics) {
+	var diags typ.Diagnostics
+
+	protoReq := &tfprotov5.MoveResourceStateRequest{
+		SourceProviderAddress: request.SourceProviderAddress,
+		SourceTypeName:        request.SourceTypeName,
+		SourceSchemaVersion:   request.SourceSchemaVersion,
+		SourceState: &tfprotov5.RawState{
+			JSON: request.SourceStateJSON,
+		},
+		SourcePrivate:  request.SourcePrivate,
+		TargetTypeName: request.TargetTypeName,
+	}
+
+	protoResp, err := c.client.MoveResourceState(ctx, protoReq)
+	if err != nil {
+		return nil, typ.RPCErrorDiagnostics(err)
+	}
+
+	schema := c.schemas
+	targetType, ok := schema.ResourceTypes[request.TargetTypeName]
+	if !ok {
+		diags = append(diags, typ.ErrorDiagnostics("no schema", fmt.Errorf("unknown resource type %q", request.TargetTypeName))...)
+		return nil, diags
+	}
+
+	state, err := decodeDynamicValue(protoResp.TargetState, configschema.SchemaBlockImpliedType(targetType.Block))
+	if err != nil {
+		diags = append(diags, typ.ErrorDiagnostics("decode dynamic value", err)...)
+		return nil, diags
+	}
+
+	return &typ.MoveResourceStateResponse{
+		TargetState:   state,
+		TargetPrivate: protoResp.TargetPrivate,
+	}, nil
 }
 
 func (c *Client) ReadDataSource(ctx context.Context, request typ.ReadDataSourceRequest) (*typ.ReadDataSourceResponse, typ.Diagnostics) {
@@ -573,6 +648,9 @@ func (c *Client) ReadDataSource(ctx context.Context, request typ.ReadDataSourceR
 	protoReq := &tfprotov5.ReadDataSourceRequest{
 		TypeName: request.TypeName,
 		Config:   &tfprotov5.DynamicValue{MsgPack: mp},
+		ClientCapabilities: &tfprotov5.ReadDataSourceClientCapabilities{
+			DeferralAllowed: request.ClientCapabilities.DeferralAllowed,
+		},
 	}
 
 	// The second check here is not something from terraform's implementation, should be derived from the schema drift in tfjson module.
@@ -604,8 +682,77 @@ func (c *Client) ReadDataSource(ctx context.Context, request typ.ReadDataSourceR
 	}
 
 	return &typ.ReadDataSourceResponse{
-		State: state,
+		State:    state,
+		Deferred: convert.ProtoToDeferred(resp.Deferred),
 	}, diags
+}
+
+func (c *Client) CallFunction(ctx context.Context, request typ.CallFunctionRequest) (*typ.CallFunctionResponse, typ.Diagnostics) {
+	var diags typ.Diagnostics
+	schema := c.schemas
+
+	funcDecl, ok := schema.Functions[request.FunctionName]
+	if !ok {
+		diags = append(diags, typ.ErrorDiagnostics("no schema", fmt.Errorf("unknown function name type %q", request.FunctionName))...)
+		return nil, diags
+	}
+	if len(request.Arguments) < len(funcDecl.Parameters) {
+		diags = append(diags, typ.ErrorDiagnostics("call function error", fmt.Errorf("not enough arguments for function %q", request.FunctionName))...)
+		return nil, diags
+	}
+	if funcDecl.VariadicParameter == nil && len(request.Arguments) > len(funcDecl.Parameters) {
+		diags = append(diags, typ.ErrorDiagnostics("call function error", fmt.Errorf("too many arguments for function %q", request.FunctionName))...)
+		return nil, diags
+	}
+	args := make([]*tfprotov5.DynamicValue, len(request.Arguments))
+	for i, argVal := range request.Arguments {
+		var paramDecl typ.FunctionParam
+		if i < len(funcDecl.Parameters) {
+			paramDecl = funcDecl.Parameters[i]
+		} else {
+			paramDecl = *funcDecl.VariadicParameter
+		}
+
+		argValRaw, err := msgpack.Marshal(argVal, paramDecl.Type)
+		if err != nil {
+			diags = append(diags, typ.ErrorDiagnostics("call function error", fmt.Errorf("marshal argument: %v", err))...)
+			return nil, diags
+		}
+		args[i] = &tfprotov5.DynamicValue{
+			MsgPack: argValRaw,
+		}
+	}
+
+	protoResp, err := c.client.CallFunction(ctx, &tfprotov5.CallFunctionRequest{
+		Name:      request.FunctionName,
+		Arguments: args,
+	})
+	if err != nil {
+		diags = append(diags, typ.RPCErrorDiagnostics(err)...)
+		return nil, diags
+	}
+
+	resp := &typ.CallFunctionResponse{}
+
+	if protoResp.Error != nil {
+		resp.Err = errors.New(protoResp.Error.Text)
+
+		// If this is a problem with a specific argument, we can wrap the error
+		// in a function.ArgError
+		if protoResp.Error.FunctionArgument != nil {
+			resp.Err = function.NewArgError(int(*protoResp.Error.FunctionArgument), resp.Err)
+		}
+
+		return resp, nil
+	}
+
+	resultVal, err := decodeDynamicValue(protoResp.Result, funcDecl.ReturnType)
+	if err != nil {
+		diags = append(diags, typ.ErrorDiagnostics("call function error", fmt.Errorf("decoding return value: %v", err))...)
+		return nil, diags
+	}
+	resp.Result = resultVal
+	return resp, nil
 }
 
 func (c *Client) Close() {

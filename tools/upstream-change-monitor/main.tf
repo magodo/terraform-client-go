@@ -25,40 +25,52 @@ provider "restful" {
 }
 
 locals {
-  terraform-plugin-go-commit = "ada9da97012681d925c937a654e50cf6b0014707"
+  terraform-plugin-go-commit = "v0.23.0"
   terraform-plugin-go = toset([
+    "tfprotov5/internal/tfplugin5/tfplugin5.proto",
+    "tfprotov6/internal/tfplugin6/tfplugin6.proto",
+
     "tfprotov5/internal/fromproto/attribute_path.go",
     "tfprotov5/internal/fromproto/data_source.go",
     "tfprotov5/internal/fromproto/diagnostic.go",
+    "tfprotov5/internal/fromproto/function.go",
     "tfprotov5/internal/fromproto/provider.go",
     "tfprotov5/internal/fromproto/resource.go",
     "tfprotov5/internal/fromproto/schema.go",
+    "tfprotov5/internal/fromproto/server_capabilities.go",
     "tfprotov5/internal/fromproto/state.go",
     "tfprotov5/internal/fromproto/string_kind.go",
     "tfprotov5/internal/fromproto/types.go",
+
     "tfprotov5/internal/toproto/attribute_path.go",
     "tfprotov5/internal/toproto/data_source.go",
     "tfprotov5/internal/toproto/diagnostic.go",
     "tfprotov5/internal/toproto/dynamic_value.go",
+    "tfprotov5/internal/toproto/function.go",
     "tfprotov5/internal/toproto/provider.go",
     "tfprotov5/internal/toproto/resource.go",
     "tfprotov5/internal/toproto/schema.go",
     "tfprotov5/internal/toproto/server_capabilities.go",
     "tfprotov5/internal/toproto/state.go",
     "tfprotov5/internal/toproto/string_kind.go",
+
     "tfprotov6/internal/fromproto/attribute_path.go",
     "tfprotov6/internal/fromproto/data_source.go",
     "tfprotov6/internal/fromproto/diagnostic.go",
+    "tfprotov6/internal/fromproto/function.go",
     "tfprotov6/internal/fromproto/provider.go",
     "tfprotov6/internal/fromproto/resource.go",
     "tfprotov6/internal/fromproto/schema.go",
+    "tfprotov6/internal/fromproto/server_capabilities.go",
     "tfprotov6/internal/fromproto/state.go",
     "tfprotov6/internal/fromproto/string_kind.go",
     "tfprotov6/internal/fromproto/types.go",
+
     "tfprotov6/internal/toproto/attribute_path.go",
     "tfprotov6/internal/toproto/data_source.go",
     "tfprotov6/internal/toproto/diagnostic.go",
     "tfprotov6/internal/toproto/dynamic_value.go",
+    "tfprotov6/internal/toproto/function.go",
     "tfprotov6/internal/toproto/provider.go",
     "tfprotov6/internal/toproto/resource.go",
     "tfprotov6/internal/toproto/schema.go",
@@ -66,15 +78,20 @@ locals {
     "tfprotov6/internal/toproto/state.go",
     "tfprotov6/internal/toproto/string_kind.go",
   ])
-  terraform-commit = "15ecdb66c84cd8202b0ae3d34c44cb4bbece5444"
+  terraform-commit = "v1.10.0-alpha20240730"
   terraform = toset([
     "internal/providers/provider.go",
+    "internal/providers/functions.go",
     "internal/configs/configschema/decoder_spec.go",
     "internal/configs/configschema/empty_value.go",
     "internal/configs/configschema/implied_type.go",
     "internal/plugin/convert/schema.go",
+    "internal/plugin/convert/deferred.go",
+    "internal/plugin/convert/functions.go",
     "internal/plugin/grpc_provider.go",
     "internal/plugin6/convert/schema.go",
+    "internal/plugin6/convert/deferred.go",
+    "internal/plugin6/convert/functions.go",
     "internal/plugin6/grpc_provider.go",
   ])
 }
@@ -120,7 +137,7 @@ output "terraform-plugin-go-changes" {
     for f in local.terraform-plugin-go : f if
     data.restful_resource.terraform-plugin-go-used[f].output != null && data.restful_resource.terraform-plugin-go-main[f].output != null ?
     # Content diff
-    jsondecode(data.restful_resource.terraform-plugin-go-used[f].output).sha != jsondecode(data.restful_resource.terraform-plugin-go-main[f].output).sha
+    data.restful_resource.terraform-plugin-go-used[f].output.sha != data.restful_resource.terraform-plugin-go-main[f].output.sha
     :
     # Existance diff
     data.restful_resource.terraform-plugin-go-used[f].output == null != data.restful_resource.terraform-plugin-go-main[f].output == null
@@ -132,7 +149,7 @@ output "terraform-changes" {
     for f in local.terraform : f if
     data.restful_resource.terraform-used[f].output != null && data.restful_resource.terraform-main[f].output != null ?
     # Content diff
-    jsondecode(data.restful_resource.terraform-used[f].output).sha != jsondecode(data.restful_resource.terraform-main[f].output).sha
+    data.restful_resource.terraform-used[f].output.sha != data.restful_resource.terraform-main[f].output.sha
     :
     # Existance diff
     data.restful_resource.terraform-used[f].output == null != data.restful_resource.terraform-main[f].output == null

@@ -1,3 +1,5 @@
+// This is derived from github.com/hashicorp/terraform/internal/configs/configschema/decoder_spec.go (c395d90b375e2b230384d0c213fe26a06b76222b)
+
 package configschema
 
 import (
@@ -177,11 +179,11 @@ func DecoderSpec(b *tfjson.SchemaBlock) hcldec.Spec {
 }
 
 func decoderSpec(a *tfjson.SchemaAttribute, name string) hcldec.Spec {
-	ret := &hcldec.AttrSpec{Name: name}
-	if a == nil {
-		return ret
+	if a == nil || (a.AttributeType == cty.NilType && a.AttributeNestedType == nil) {
+		panic("Invalid attribute schema: schema is nil.")
 	}
 
+	ret := &hcldec.AttrSpec{Name: name}
 	if a.AttributeNestedType != nil {
 		if a.AttributeType != cty.NilType {
 			panic("Invalid attribute schema: NestedType and Type cannot both be set. This is a bug in the provider.")

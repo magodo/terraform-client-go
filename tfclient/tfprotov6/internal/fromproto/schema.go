@@ -2,13 +2,16 @@ package fromproto
 
 import (
 	"fmt"
-	"github.com/magodo/terraform-client-go/tfclient/tfprotov6/internal/tfplugin6"
 
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
+	"github.com/magodo/terraform-client-go/tfclient/tfprotov6/internal/tfplugin6"
 )
 
 func Schema(in *tfplugin6.Schema) (*tfprotov6.Schema, error) {
+	if in == nil {
+		return nil, nil
+	}
 	var resp tfprotov6.Schema
 	resp.Version = in.Version
 	if in.Block != nil {

@@ -1,3 +1,7 @@
+tools:
+	go install google.golang.org/protobuf/cmd/protoc-gen-go
+	cd buildtools; go install google.golang.org/grpc/cmd/protoc-gen-go-grpc
+
 protoc:
 	@cd tfclient/tfprotov5/internal/tfplugin5 && \
 		protoc \
@@ -16,4 +20,4 @@ protoc:
 			--go-grpc_opt=paths=source_relative \
 			tfplugin6.proto
 
-.PHONY: protoc
+.PHONY: protoc tools

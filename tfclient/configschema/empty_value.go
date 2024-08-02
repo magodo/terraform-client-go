@@ -1,3 +1,5 @@
+// This is derived from github.com/hashicorp/terraform/internal/configs/configschema/empty_value.go (c395d90b375e2b230384d0c213fe26a06b76222b)
+
 package configschema
 
 import (

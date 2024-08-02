@@ -5,12 +5,16 @@ import (
 	"github.com/magodo/terraform-client-go/tfclient/tfprotov5/internal/tfplugin5"
 )
 
-func GetProviderSchema_ServerCapabilities(in *tfprotov5.ServerCapabilities) *tfplugin5.GetProviderSchema_ServerCapabilities {
+func ServerCapabilities(in *tfprotov5.ServerCapabilities) *tfplugin5.ServerCapabilities {
 	if in == nil {
 		return nil
 	}
 
-	return &tfplugin5.GetProviderSchema_ServerCapabilities{
-		PlanDestroy: in.PlanDestroy,
+	resp := &tfplugin5.ServerCapabilities{
+		GetProviderSchemaOptional: in.GetProviderSchemaOptional,
+		MoveResourceState:         in.MoveResourceState,
+		PlanDestroy:               in.PlanDestroy,
 	}
+
+	return resp
 }
