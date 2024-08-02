@@ -60,13 +60,17 @@ func New(pluginClient *plugin.Client, grpcClient tfprotov5.ProviderServer, schem
 	}
 
 	schemas := typ.GetProviderSchemaResponse{
-		Provider:      convert.ProtoToProviderSchema(resp.Provider),
-		ProviderMeta:  convert.ProtoToProviderSchema(resp.ProviderMeta),
 		ResourceTypes: map[string]tfjson.Schema{},
 		DataSources:   map[string]tfjson.Schema{},
 		ServerCapabilities: typ.ServerCapabilities{
 			PlanDestroy: false,
 		},
+	}
+	if resp.Provider != nil {
+		schemas.Provider = convert.ProtoToProviderSchema(resp.Provider)
+	}
+	if resp.ProviderMeta != nil {
+		schemas.ProviderMeta = convert.ProtoToProviderSchema(resp.ProviderMeta)
 	}
 	if resp.ServerCapabilities != nil {
 		schemas.ServerCapabilities.PlanDestroy = resp.ServerCapabilities.PlanDestroy

@@ -67,9 +67,12 @@ func GetProviderSchemaResponse(in *tfplugin6.GetProviderSchema_Response) (*tfpro
 		return nil, err
 	}
 
-	providerMeta, err := Schema(in.ProviderMeta)
-	if err != nil {
-		return nil, err
+	var providerMeta *tfprotov6.Schema
+	if in.ProviderMeta != nil {
+		providerMeta, err = Schema(in.ProviderMeta)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	resourceSchemas := make(map[string]*tfprotov6.Schema, len(in.ResourceSchemas))
