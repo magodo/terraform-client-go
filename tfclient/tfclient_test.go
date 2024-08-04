@@ -55,16 +55,32 @@ func BenchmarkClient(b *testing.B) {
 	}
 
 	b.Run("Spawn", func(b *testing.B) {
-		schema := processBySpawn(b, providerPath, nil, nil)
+		schema := processBySpawn(b, providerPath, false, nil, nil)
 
 		b.Run("WithoutSchema", func(b *testing.B) {
-			for i := 0; i < b.N; i++ {
-				processBySpawn(b, providerPath, nil, configureImportRead)
-			}
+			b.Run("EnableLogStderr", func(b *testing.B) {
+				for i := 0; i < b.N; i++ {
+					processBySpawn(b, providerPath, false, nil, configureImportRead)
+				}
+			})
+			b.Run("DisableLogStderr", func(b *testing.B) {
+				for i := 0; i < b.N; i++ {
+					processBySpawn(b, providerPath, true, nil, configureImportRead)
+				}
+			})
 		})
 		b.Run("WithSchema", func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
-				processBySpawn(b, providerPath, &schema, configureImportRead)
+				b.Run("EnableLogStderr", func(b *testing.B) {
+					for i := 0; i < b.N; i++ {
+						processBySpawn(b, providerPath, false, &schema, configureImportRead)
+					}
+				})
+				b.Run("DisableLogStderr", func(b *testing.B) {
+					for i := 0; i < b.N; i++ {
+						processBySpawn(b, providerPath, true, &schema, configureImportRead)
+					}
+				})
 			}
 		})
 	})
@@ -88,11 +104,15 @@ func BenchmarkClient(b *testing.B) {
 	})
 }
 
-func processBySpawn(b *testing.B, providerPath string, schema *typ.GetProviderSchemaResponse, pf processFunc) typ.GetProviderSchemaResponse {
+func processBySpawn(b *testing.B, providerPath string, disableLogStderr bool, schema *typ.GetProviderSchemaResponse, pf processFunc) typ.GetProviderSchemaResponse {
+	cmd := exec.Cmd{
+		Path: providerPath,
+	}
 	opts := tfclient.Option{
-		Cmd:            exec.Command(providerPath),
-		Logger:         hclog.NewNullLogger(),
-		ProviderSchema: schema,
+		Cmd:              &cmd,
+		Logger:           hclog.NewNullLogger(),
+		ProviderSchema:   schema,
+		DisableLogStderr: disableLogStderr,
 	}
 
 	c, err := tfclient.New(opts)
