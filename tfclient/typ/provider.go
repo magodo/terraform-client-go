@@ -11,14 +11,26 @@ type GetProviderSchemaResponse struct {
 	// Provider is the schema for the provider itself.
 	Provider tfjson.Schema
 
+	// ProviderCty is the cty type of the provider schema.
+	ProviderCty cty.Type
+
 	// ProviderMeta is the schema for the provider's meta info in a module
 	ProviderMeta tfjson.Schema
+
+	// ProviderMetaCty is the cty type of the provider's meta schema.
+	ProviderMetaCty cty.Type
 
 	// ResourceTypes map the resource type name to that type's schema.
 	ResourceTypes map[string]tfjson.Schema
 
-	// DataSources maps the data source name to that data source's schema.
+	// ResourceTypesCty map the resource type name to the cty type of that type's schema.
+	ResourceTypesCty map[string]cty.Type
+
+	// DataSources maps the data source type name to that data source's schema.
 	DataSources map[string]tfjson.Schema
+
+	// DataSourceTypesCty map the data source type name to the cty type of that type's schema.
+	DataSourcesCty map[string]cty.Type
 
 	// Functions maps from local function name (not including an namespace
 	// prefix) to the declaration of a function.

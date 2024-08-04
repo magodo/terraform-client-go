@@ -60,27 +60,37 @@ func New(pluginClient *plugin.Client, grpcClient tfprotov5.ProviderServer, schem
 	}
 
 	schemas := typ.GetProviderSchemaResponse{
-		ResourceTypes: map[string]tfjson.Schema{},
-		DataSources:   map[string]tfjson.Schema{},
-		Functions:     map[string]typ.FunctionDecl{},
+		ResourceTypes:    map[string]tfjson.Schema{},
+		ResourceTypesCty: map[string]cty.Type{},
+		DataSources:      map[string]tfjson.Schema{},
+		DataSourcesCty:   map[string]cty.Type{},
+		Functions:        map[string]typ.FunctionDecl{},
 		ServerCapabilities: typ.ServerCapabilities{
 			PlanDestroy: false,
 		},
 	}
 	if resp.Provider != nil {
-		schemas.Provider = convert.ProtoToProviderSchema(resp.Provider)
+		providerSchema := convert.ProtoToProviderSchema(resp.Provider)
+		schemas.Provider = providerSchema
+		schemas.ProviderCty = configschema.SchemaBlockImpliedType(providerSchema.Block)
 	}
 	if resp.ProviderMeta != nil {
-		schemas.ProviderMeta = convert.ProtoToProviderSchema(resp.ProviderMeta)
+		providerMetaSchema := convert.ProtoToProviderSchema(resp.ProviderMeta)
+		schemas.ProviderMeta = providerMetaSchema
+		schemas.ProviderMetaCty = configschema.SchemaBlockImpliedType(providerMetaSchema.Block)
 	}
 	if resp.ServerCapabilities != nil {
 		schemas.ServerCapabilities.PlanDestroy = resp.ServerCapabilities.PlanDestroy
 	}
 	for name, schema := range resp.ResourceSchemas {
-		schemas.ResourceTypes[name] = convert.ProtoToProviderSchema(schema)
+		resourceSchema := convert.ProtoToProviderSchema(schema)
+		schemas.ResourceTypes[name] = resourceSchema
+		schemas.ResourceTypesCty[name] = configschema.SchemaBlockImpliedType(resourceSchema.Block)
 	}
 	for name, schema := range resp.DataSourceSchemas {
-		schemas.DataSources[name] = convert.ProtoToProviderSchema(schema)
+		dataSourceSchema := convert.ProtoToProviderSchema(schema)
+		schemas.DataSources[name] = dataSourceSchema
+		schemas.DataSourcesCty[name] = configschema.SchemaBlockImpliedType(dataSourceSchema.Block)
 	}
 	for name, fun := range resp.Functions {
 		schemas.Functions[name], err = convert.FunctionDeclFromProto(fun)
@@ -101,7 +111,7 @@ func (c *Client) GetProviderSchema() (*typ.GetProviderSchemaResponse, typ.Diagno
 func (c *Client) ValidateProviderConfig(ctx context.Context, request typ.ValidateProviderConfigRequest) (*typ.ValidateProviderConfigResponse, typ.Diagnostics) {
 	var diags typ.Diagnostics
 
-	ty := configschema.SchemaBlockImpliedType(c.schemas.Provider.Block)
+	ty := c.schemas.ProviderCty
 
 	mp, err := msgpack.Marshal(request.Config, ty)
 	if err != nil {
@@ -139,13 +149,7 @@ func (c *Client) ValidateResourceConfig(ctx context.Context, request typ.Validat
 	var diags typ.Diagnostics
 
 	schema := c.schemas
-	resourceSchema, ok := schema.ResourceTypes[request.TypeName]
-	if !ok {
-		diags = append(diags, typ.ErrorDiagnostics("no schema", fmt.Errorf("unknown resource type %q", request.TypeName))...)
-		return nil, diags
-	}
-
-	mp, err := msgpack.Marshal(request.Config, configschema.SchemaBlockImpliedType(resourceSchema.Block))
+	mp, err := msgpack.Marshal(request.Config, schema.ResourceTypesCty[request.TypeName])
 	if err != nil {
 		diags = append(diags, typ.ErrorDiagnostics("msgpack marshal", err)...)
 		return nil, diags
@@ -172,13 +176,7 @@ func (c *Client) ValidateDataResourceConfig(ctx context.Context, request typ.Val
 	var diags typ.Diagnostics
 
 	schema := c.schemas
-	datasourceSchema, ok := schema.DataSources[request.TypeName]
-	if !ok {
-		diags = append(diags, typ.ErrorDiagnostics("no schema", fmt.Errorf("unknown data source type %q", request.TypeName))...)
-		return nil, diags
-	}
-
-	mp, err := msgpack.Marshal(request.Config, configschema.SchemaBlockImpliedType(datasourceSchema.Block))
+	mp, err := msgpack.Marshal(request.Config, schema.DataSourcesCty[request.TypeName])
 	if err != nil {
 		diags = append(diags, typ.ErrorDiagnostics("msgpack marshal", err)...)
 		return nil, diags
@@ -206,7 +204,7 @@ func (c *Client) UpgradeResourceState(ctx context.Context, request typ.UpgradeRe
 
 	schema := c.schemas
 
-	resSchema, ok := schema.ResourceTypes[request.TypeName]
+	ty, ok := schema.ResourceTypesCty[request.TypeName]
 	if !ok {
 		diags = append(diags, typ.ErrorDiagnostics("no schema", fmt.Errorf("unknown resource type %q", request.TypeName))...)
 		return nil, diags
@@ -232,7 +230,6 @@ func (c *Client) UpgradeResourceState(ctx context.Context, request typ.UpgradeRe
 		return nil, diags
 	}
 
-	ty := configschema.SchemaBlockImpliedType(resSchema.Block)
 	state := cty.NullVal(ty)
 	if resp.UpgradedState != nil {
 		state, err = decodeDynamicValue(resp.UpgradedState, ty)
@@ -264,7 +261,7 @@ func (c *Client) ConfigureProvider(ctx context.Context, request typ.ConfigurePro
 	schema := c.schemas
 	mp, err := msgpack.Marshal(
 		request.Config,
-		configschema.SchemaBlockImpliedType(schema.Provider.Block),
+		schema.ProviderCty,
 	)
 	if err != nil {
 		diags := typ.ErrorDiagnostics("msgpack marshal", err)
@@ -311,15 +308,15 @@ func (c *Client) ReadResource(ctx context.Context, request typ.ReadResourceReque
 	var diags typ.Diagnostics
 	schema := c.schemas
 
-	resSchema, ok := schema.ResourceTypes[request.TypeName]
+	resTyp, ok := schema.ResourceTypesCty[request.TypeName]
 	if !ok {
 		diags = append(diags, typ.ErrorDiagnostics("no schema", fmt.Errorf("unknown resource type %q", request.TypeName))...)
 		return nil, diags
 	}
 
-	metaSchema := schema.ProviderMeta
+	metaTyp := schema.ProviderMetaCty
 
-	mp, err := msgpack.Marshal(request.PriorState, configschema.SchemaBlockImpliedType(resSchema.Block))
+	mp, err := msgpack.Marshal(request.PriorState, resTyp)
 	if err != nil {
 		diags = append(diags, typ.ErrorDiagnostics("msgpack marshal", err)...)
 		return nil, diags
@@ -335,8 +332,9 @@ func (c *Client) ReadResource(ctx context.Context, request typ.ReadResourceReque
 	}
 
 	// The second check here is not something from terraform's implementation, should be derived from the schema drift in tfjson module.
-	if metaSchema.Block != nil && len(metaSchema.Block.NestedBlocks)+len(metaSchema.Block.Attributes) != 0 {
-		metaMP, err := msgpack.Marshal(request.ProviderMeta, configschema.SchemaBlockImpliedType(metaSchema.Block))
+	//if metaSchema.Block != nil && len(metaSchema.Block.NestedBlocks)+len(metaSchema.Block.Attributes) != 0 {
+	if !metaTyp.Equals(cty.EmptyObject) {
+		metaMP, err := msgpack.Marshal(request.ProviderMeta, metaTyp)
 		if err != nil {
 			diags = append(diags, typ.ErrorDiagnostics("msgpack marshal", err)...)
 			return nil, diags
@@ -356,7 +354,7 @@ func (c *Client) ReadResource(ctx context.Context, request typ.ReadResourceReque
 		return nil, diags
 	}
 
-	state, err := decodeDynamicValue(resp.NewState, configschema.SchemaBlockImpliedType(resSchema.Block))
+	state, err := decodeDynamicValue(resp.NewState, resTyp)
 	if err != nil {
 		diags = append(diags, typ.ErrorDiagnostics("decode dynamic value", err)...)
 		return nil, diags
@@ -373,13 +371,13 @@ func (c *Client) PlanResourceChange(ctx context.Context, request typ.PlanResourc
 	var diags typ.Diagnostics
 	schema := c.schemas
 
-	resSchema, ok := schema.ResourceTypes[request.TypeName]
+	resTyp, ok := schema.ResourceTypesCty[request.TypeName]
 	if !ok {
 		diags = append(diags, typ.ErrorDiagnostics("no schema", fmt.Errorf("unknown resource type %q", request.TypeName))...)
 		return nil, diags
 	}
 
-	metaSchema := schema.ProviderMeta
+	metaTyp := schema.ProviderMetaCty
 	capabilities := schema.ServerCapabilities
 
 	var response typ.PlanResourceChangeResponse
@@ -392,19 +390,19 @@ func (c *Client) PlanResourceChange(ctx context.Context, request typ.PlanResourc
 		return &response, nil
 	}
 
-	priorMP, err := msgpack.Marshal(request.PriorState, configschema.SchemaBlockImpliedType(resSchema.Block))
+	priorMP, err := msgpack.Marshal(request.PriorState, resTyp)
 	if err != nil {
 		diags = append(diags, typ.ErrorDiagnostics("msgpack marshal", err)...)
 		return nil, diags
 	}
 
-	configMP, err := msgpack.Marshal(request.Config, configschema.SchemaBlockImpliedType(resSchema.Block))
+	configMP, err := msgpack.Marshal(request.Config, resTyp)
 	if err != nil {
 		diags = append(diags, typ.ErrorDiagnostics("msgpack marshal", err)...)
 		return nil, diags
 	}
 
-	propMP, err := msgpack.Marshal(request.ProposedNewState, configschema.SchemaBlockImpliedType(resSchema.Block))
+	propMP, err := msgpack.Marshal(request.ProposedNewState, resTyp)
 	if err != nil {
 		diags = append(diags, typ.ErrorDiagnostics("msgpack marshal", err)...)
 		return nil, diags
@@ -422,13 +420,13 @@ func (c *Client) PlanResourceChange(ctx context.Context, request typ.PlanResourc
 	}
 
 	// The second check here is not something from terraform's implementation, should be derived from the schema drift in tfjson module.
-	if metaSchema.Block != nil && len(metaSchema.Block.NestedBlocks)+len(metaSchema.Block.Attributes) != 0 {
-		metaTy := configschema.SchemaBlockImpliedType(metaSchema.Block)
+	//if metaSchema.Block != nil && len(metaSchema.Block.NestedBlocks)+len(metaSchema.Block.Attributes) != 0 {
+	if !metaTyp.Equals(cty.EmptyObject) {
 		metaVal := request.ProviderMeta
 		if metaVal == cty.NilVal {
-			metaVal = cty.NullVal(metaTy)
+			metaVal = cty.NullVal(metaTyp)
 		}
-		metaMP, err := msgpack.Marshal(metaVal, metaTy)
+		metaMP, err := msgpack.Marshal(metaVal, metaTyp)
 		if err != nil {
 			diags = append(diags, typ.ErrorDiagnostics("msgpack marshal", err)...)
 			return nil, diags
@@ -447,7 +445,7 @@ func (c *Client) PlanResourceChange(ctx context.Context, request typ.PlanResourc
 		return nil, diags
 	}
 
-	state, err := decodeDynamicValue(protoResp.PlannedState, configschema.SchemaBlockImpliedType(resSchema.Block))
+	state, err := decodeDynamicValue(protoResp.PlannedState, resTyp)
 	if err != nil {
 		diags = append(diags, typ.ErrorDiagnostics("decode dynamic value", err)...)
 		return nil, diags
@@ -471,25 +469,25 @@ func (c *Client) ApplyResourceChange(ctx context.Context, request typ.ApplyResou
 	var diags typ.Diagnostics
 	schema := c.schemas
 
-	resSchema, ok := schema.ResourceTypes[request.TypeName]
+	resTyp, ok := schema.ResourceTypesCty[request.TypeName]
 	if !ok {
 		diags = append(diags, typ.ErrorDiagnostics("no schema", fmt.Errorf("unknown resource type %q", request.TypeName))...)
 		return nil, diags
 	}
 
-	metaSchema := schema.ProviderMeta
+	metaTyp := schema.ProviderMetaCty
 
-	priorMP, err := msgpack.Marshal(request.PriorState, configschema.SchemaBlockImpliedType(resSchema.Block))
+	priorMP, err := msgpack.Marshal(request.PriorState, resTyp)
 	if err != nil {
 		diags = append(diags, typ.ErrorDiagnostics("msgpack marshal", err)...)
 		return nil, diags
 	}
-	plannedMP, err := msgpack.Marshal(request.PlannedState, configschema.SchemaBlockImpliedType(resSchema.Block))
+	plannedMP, err := msgpack.Marshal(request.PlannedState, resTyp)
 	if err != nil {
 		diags = append(diags, typ.ErrorDiagnostics("msgpack marshal", err)...)
 		return nil, diags
 	}
-	configMP, err := msgpack.Marshal(request.Config, configschema.SchemaBlockImpliedType(resSchema.Block))
+	configMP, err := msgpack.Marshal(request.Config, resTyp)
 	if err != nil {
 		diags = append(diags, typ.ErrorDiagnostics("msgpack marshal", err)...)
 		return nil, diags
@@ -504,13 +502,13 @@ func (c *Client) ApplyResourceChange(ctx context.Context, request typ.ApplyResou
 	}
 
 	// The second check here is not something from terraform's implementation, should be derived from the schema drift in tfjson module.
-	if metaSchema.Block != nil && len(metaSchema.Block.NestedBlocks)+len(metaSchema.Block.Attributes) != 0 {
-		metaTy := configschema.SchemaBlockImpliedType(metaSchema.Block)
+	//if metaSchema.Block != nil && len(metaSchema.Block.NestedBlocks)+len(metaSchema.Block.Attributes) != 0 {
+	if !metaTyp.Equals(cty.EmptyObject) {
 		metaVal := request.ProviderMeta
 		if metaVal == cty.NilVal {
-			metaVal = cty.NullVal(metaTy)
+			metaVal = cty.NullVal(metaTyp)
 		}
-		metaMP, err := msgpack.Marshal(metaVal, metaTy)
+		metaMP, err := msgpack.Marshal(metaVal, metaTyp)
 		if err != nil {
 			diags = append(diags, typ.ErrorDiagnostics("msgpack marshal", err)...)
 			return nil, diags
@@ -529,7 +527,7 @@ func (c *Client) ApplyResourceChange(ctx context.Context, request typ.ApplyResou
 		return nil, diags
 	}
 
-	state, err := decodeDynamicValue(protoResp.NewState, configschema.SchemaBlockImpliedType(metaSchema.Block))
+	state, err := decodeDynamicValue(protoResp.NewState, resTyp)
 	if err != nil {
 		diags = append(diags, typ.ErrorDiagnostics("msgpack marshal", err)...)
 		return nil, diags
@@ -571,13 +569,13 @@ func (c *Client) ImportResourceState(ctx context.Context, request typ.ImportReso
 			Private:  imported.Private,
 		}
 
-		resSchema, ok := schema.ResourceTypes[imported.TypeName]
+		resTyp, ok := schema.ResourceTypesCty[imported.TypeName]
 		if !ok {
 			diags = append(diags, typ.ErrorDiagnostics("no schema", fmt.Errorf("unknown resource type %q", imported.TypeName))...)
 			continue
 		}
 
-		state, err := decodeDynamicValue(imported.State, configschema.SchemaBlockImpliedType(resSchema.Block))
+		state, err := decodeDynamicValue(imported.State, resTyp)
 		if err != nil {
 			diags = append(diags, typ.ErrorDiagnostics("decode dynamic value", err)...)
 			return nil, diags
@@ -609,13 +607,13 @@ func (c *Client) MoveResourceState(ctx context.Context, request typ.MoveResource
 	}
 
 	schema := c.schemas
-	targetType, ok := schema.ResourceTypes[request.TargetTypeName]
+	targetType, ok := schema.ResourceTypesCty[request.TargetTypeName]
 	if !ok {
 		diags = append(diags, typ.ErrorDiagnostics("no schema", fmt.Errorf("unknown resource type %q", request.TargetTypeName))...)
 		return nil, diags
 	}
 
-	state, err := decodeDynamicValue(protoResp.TargetState, configschema.SchemaBlockImpliedType(targetType.Block))
+	state, err := decodeDynamicValue(protoResp.TargetState, targetType)
 	if err != nil {
 		diags = append(diags, typ.ErrorDiagnostics("decode dynamic value", err)...)
 		return nil, diags
@@ -631,15 +629,15 @@ func (c *Client) ReadDataSource(ctx context.Context, request typ.ReadDataSourceR
 	var diags typ.Diagnostics
 	schema := c.schemas
 
-	dsSchema, ok := schema.DataSources[request.TypeName]
+	dstTyp, ok := schema.DataSourcesCty[request.TypeName]
 	if !ok {
 		diags = append(diags, typ.ErrorDiagnostics("no schema", fmt.Errorf("unknown data source type %q", request.TypeName))...)
 		return nil, diags
 	}
 
-	metaSchema := schema.ProviderMeta
+	metaTyp := schema.ProviderMetaCty
 
-	mp, err := msgpack.Marshal(request.Config, configschema.SchemaBlockImpliedType(dsSchema.Block))
+	mp, err := msgpack.Marshal(request.Config, dstTyp)
 	if err != nil {
 		diags = append(diags, typ.ErrorDiagnostics("msgpack marshal", err)...)
 		return nil, diags
@@ -654,8 +652,9 @@ func (c *Client) ReadDataSource(ctx context.Context, request typ.ReadDataSourceR
 	}
 
 	// The second check here is not something from terraform's implementation, should be derived from the schema drift in tfjson module.
-	if metaSchema.Block != nil && len(metaSchema.Block.NestedBlocks)+len(metaSchema.Block.Attributes) != 0 {
-		metaMP, err := msgpack.Marshal(request.ProviderMeta, configschema.SchemaBlockImpliedType(metaSchema.Block))
+	//if metaSchema.Block != nil && len(metaSchema.Block.NestedBlocks)+len(metaSchema.Block.Attributes) != 0 {
+	if !metaTyp.Equals(cty.EmptyObject) {
+		metaMP, err := msgpack.Marshal(request.ProviderMeta, metaTyp)
 		if err != nil {
 			diags = append(diags, typ.ErrorDiagnostics("msgpack marshal", err)...)
 			return nil, diags
@@ -675,7 +674,7 @@ func (c *Client) ReadDataSource(ctx context.Context, request typ.ReadDataSourceR
 		return nil, diags
 	}
 
-	state, err := decodeDynamicValue(resp.State, configschema.SchemaBlockImpliedType(dsSchema.Block))
+	state, err := decodeDynamicValue(resp.State, dstTyp)
 	if err != nil {
 		diags = append(diags, typ.ErrorDiagnostics("decode dynamic value", err)...)
 		return nil, diags
