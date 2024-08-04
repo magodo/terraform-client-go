@@ -215,26 +215,29 @@ func configureImportRead(b *testing.B, c tfclient.Client) error {
 		b.Logf("Skipping resource import, as %q not defined", EnvResourceId)
 		return nil
 	}
-	importResp, diags := c.ImportResourceState(ctx, typ.ImportResourceStateRequest{
-		TypeName: resourceType,
-		ID:       resourceId,
-	})
-	if diags.HasErrors() {
-		return diags.Err()
-	}
 
-	if len(importResp.ImportedResources) != 1 {
-		return fmt.Errorf("expect 1 resource, got=%d", len(importResp.ImportedResources))
-	}
-	res := importResp.ImportedResources[0]
+	for i := 0; i < b.N; i++ {
+		importResp, diags := c.ImportResourceState(ctx, typ.ImportResourceStateRequest{
+			TypeName: resourceType,
+			ID:       resourceId,
+		})
+		if diags.HasErrors() {
+			return fmt.Errorf("importing: %v", diags.Err())
+		}
 
-	if _, diags := c.ReadResource(ctx, typ.ReadResourceRequest{
-		TypeName:     res.TypeName,
-		PriorState:   res.State,
-		Private:      res.Private,
-		ProviderMeta: cty.Value{},
-	}); diags.HasErrors() {
-		return diags.Err()
+		if len(importResp.ImportedResources) != 1 {
+			return fmt.Errorf("expect 1 resource, got=%d", len(importResp.ImportedResources))
+		}
+		res := importResp.ImportedResources[0]
+
+		if _, diags := c.ReadResource(ctx, typ.ReadResourceRequest{
+			TypeName:     res.TypeName,
+			PriorState:   res.State,
+			Private:      res.Private,
+			ProviderMeta: cty.Value{},
+		}); diags.HasErrors() {
+			return fmt.Errorf("reading: %v", diags.Err())
+		}
 	}
 	return nil
 }
