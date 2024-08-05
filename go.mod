@@ -41,4 +41,4 @@ require (
 	google.golang.org/genproto v0.0.0-20230110181048-76db0878b65f // indirect
 )
 
-replace github.com/hashicorp/go-plugin => ../go-plugin
+replace github.com/hashicorp/go-plugin => github.com/magodo/go-plugin v1.4.2-0.20240804095656-5e9eee40734a
