@@ -268,6 +268,8 @@ func (c *Client) ConfigureProvider(ctx context.Context, request typ.ConfigurePro
 		}
 	}
 
+	var diags typ.Diagnostics
+
 	schema := c.schemas
 	mp, err := msgpack.Marshal(
 		request.Config,
@@ -277,7 +279,7 @@ func (c *Client) ConfigureProvider(ctx context.Context, request typ.ConfigurePro
 		diags := typ.ErrorDiagnostics("msgpack marshal", err)
 		return nil, diags
 	}
-	if _, err := c.client.ConfigureProvider(ctx, &tfprotov6.ConfigureProviderRequest{
+	resp, err := c.client.ConfigureProvider(ctx, &tfprotov6.ConfigureProviderRequest{
 		TerraformVersion: request.TerraformVersion,
 		Config: &tfprotov6.DynamicValue{
 			MsgPack: mp,
@@ -285,8 +287,15 @@ func (c *Client) ConfigureProvider(ctx context.Context, request typ.ConfigurePro
 		ClientCapabilities: &tfprotov6.ConfigureProviderClientCapabilities{
 			DeferralAllowed: request.ClientCapabilities.DeferralAllowed,
 		},
-	}); err != nil {
+	})
+	if err != nil {
 		diags := typ.RPCErrorDiagnostics(err)
+		return nil, diags
+	}
+
+	respDiags := convert.DecodeDiagnostics(resp.Diagnostics)
+	diags = append(diags, respDiags...)
+	if diags.HasErrors() {
 		return nil, diags
 	}
 	c.configured = true
