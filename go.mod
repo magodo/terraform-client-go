@@ -10,7 +10,7 @@ require (
 	github.com/evanphx/json-patch/v5 v5.6.0
 	github.com/google/go-cmp v0.6.0
 	github.com/hashicorp/go-hclog v1.5.0
-	github.com/hashicorp/go-plugin v1.6.0
+	github.com/hashicorp/go-plugin v1.6.1
 	github.com/hashicorp/go-version v1.7.0
 	github.com/hashicorp/hc-install v0.9.0
 	github.com/hashicorp/hcl/v2 v2.11.1
