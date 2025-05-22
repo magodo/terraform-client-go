@@ -765,6 +765,41 @@ func (c *Client) CallFunction(ctx context.Context, request typ.CallFunctionReque
 	return resp, nil
 }
 
+// GetResourceIdentitySchemas implements tfclient.Client.
+func (c *Client) GetResourceIdentitySchemas() *typ.GetResourceIdentitySchemasResponse {
+	panic("unimplemented")
+}
+
+// ValidateListResourceConfig implements tfclient.Client.
+func (c *Client) ValidateListResourceConfig(context.Context, typ.ValidateListResourceConfigRequest) typ.Diagnostics {
+	panic("unimplemented")
+}
+
+// UpgradeResourceIdentity implements tfclient.Client.
+func (c *Client) UpgradeResourceIdentity(context.Context, typ.UpgradeResourceIdentityRequest) (*typ.UpgradeResourceIdentityResponse, typ.Diagnostics) {
+	panic("unimplemented")
+}
+
+// ValidateEphemeralResourceConfig implements tfclient.Client.
+func (c *Client) ValidateEphemeralResourceConfig(context.Context, typ.ValidateEphemeralResourceConfigRequest) typ.Diagnostics {
+	panic("unimplemented")
+}
+
+// OpenEphemeralResource implements tfclient.Client.
+func (c *Client) OpenEphemeralResource(context.Context, typ.OpenEphemeralResourceRequest) (*typ.OpenEphemeralResourceResponse, typ.Diagnostics) {
+	panic("unimplemented")
+}
+
+// CloseEphemeralResource implements tfclient.Client.
+func (c *Client) CloseEphemeralResource(context.Context, typ.CloseEphemeralResourceRequest) typ.Diagnostics {
+	panic("unimplemented")
+}
+
+// RenewEphemeralResource implements tfclient.Client.
+func (c *Client) RenewEphemeralResource(context.Context, typ.RenewEphemeralResourceRequest) (*typ.RenewEphemeralResourceResponse, typ.Diagnostics) {
+	panic("unimplemented")
+}
+
 func (c *Client) Close() {
 	c.pluginClient.Kill()
 }

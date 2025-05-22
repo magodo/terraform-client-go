@@ -32,6 +32,7 @@ func ConfigSchemaToProto(b *tfjson.SchemaBlock) *tfprotov6.SchemaBlock {
 			Required:        a.Required,
 			Sensitive:       a.Sensitive,
 			Deprecated:      a.Deprecated,
+			WriteOnly:       a.WriteOnly,
 		}
 
 		if a.AttributeType != cty.NilType {
@@ -96,6 +97,7 @@ func protoSchemaNestedBlock(name string, b *tfjson.SchemaBlockType) *tfprotov6.S
 }
 
 func ProtoToProviderSchema(s *tfprotov6.Schema) tfjson.Schema {
+	// TODO: Adding identity once https://github.com/hashicorp/terraform-json/issues/164 got resolved.
 	return tfjson.Schema{
 		Version: uint64(s.Version),
 		Block:   ProtoToConfigSchema(s.Block),
@@ -121,6 +123,7 @@ func ProtoToConfigSchema(b *tfprotov6.SchemaBlock) *tfjson.SchemaBlock {
 			Computed:        a.Computed,
 			Sensitive:       a.Sensitive,
 			Deprecated:      a.Deprecated,
+			WriteOnly:       a.WriteOnly,
 		}
 
 		if a.Type != nil {
@@ -215,6 +218,7 @@ func protoObjectToConfigSchema(b *tfprotov6.SchemaObject) *tfjson.SchemaNestedAt
 			Computed:        a.Computed,
 			Sensitive:       a.Sensitive,
 			Deprecated:      a.Deprecated,
+			WriteOnly:       a.WriteOnly,
 		}
 
 		if a.Type != nil {

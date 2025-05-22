@@ -16,23 +16,6 @@ func FunctionMetadata(in *tfplugin6.GetMetadata_FunctionMetadata) *tfprotov6.Fun
 	}
 }
 
-func CallFunctionRequest(in *tfplugin6.CallFunction_Request) *tfprotov6.CallFunctionRequest {
-	if in == nil {
-		return nil
-	}
-
-	resp := &tfprotov6.CallFunctionRequest{
-		Arguments: make([]*tfprotov6.DynamicValue, 0, len(in.Arguments)),
-		Name:      in.Name,
-	}
-
-	for _, argument := range in.Arguments {
-		resp.Arguments = append(resp.Arguments, DynamicValue(argument))
-	}
-
-	return resp
-}
-
 func CallFunctionResponse(in *tfplugin6.CallFunction_Response) *tfprotov6.CallFunctionResponse {
 	if in == nil {
 		return nil
@@ -42,16 +25,6 @@ func CallFunctionResponse(in *tfplugin6.CallFunction_Response) *tfprotov6.CallFu
 		Error:  FunctionError(in.Error),
 		Result: DynamicValue(in.Result),
 	}
-
-	return resp
-}
-
-func GetFunctionsRequest(in *tfplugin6.GetFunctions_Request) *tfprotov6.GetFunctionsRequest {
-	if in == nil {
-		return nil
-	}
-
-	resp := &tfprotov6.GetFunctionsRequest{}
 
 	return resp
 }

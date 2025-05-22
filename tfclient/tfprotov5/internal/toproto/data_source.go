@@ -30,18 +30,6 @@ func ValidateDataSourceConfig_Request(in *tfprotov5.ValidateDataSourceConfigRequ
 	return req
 }
 
-func ValidateDataSourceConfig_Response(in *tfprotov5.ValidateDataSourceConfigResponse) *tfplugin5.ValidateDataSourceConfig_Response {
-	if in == nil {
-		return nil
-	}
-
-	resp := &tfplugin5.ValidateDataSourceConfig_Response{
-		Diagnostics: Diagnostics(in.Diagnostics),
-	}
-
-	return resp
-}
-
 func ReadDataSource_Request(in *tfprotov5.ReadDataSourceRequest) *tfplugin5.ReadDataSource_Request {
 	if in == nil {
 		return nil
@@ -60,18 +48,4 @@ func ReadDataSource_Request(in *tfprotov5.ReadDataSourceRequest) *tfplugin5.Read
 	}
 
 	return req
-}
-
-func ReadDataSource_Response(in *tfprotov5.ReadDataSourceResponse) *tfplugin5.ReadDataSource_Response {
-	if in == nil {
-		return nil
-	}
-
-	resp := &tfplugin5.ReadDataSource_Response{
-		Diagnostics: Diagnostics(in.Diagnostics),
-		State:       DynamicValue(in.State),
-		Deferred:    Deferred(in.Deferred),
-	}
-
-	return resp
 }

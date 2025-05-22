@@ -15,19 +15,6 @@ func DataSourceMetadata(in *tfplugin5.GetMetadata_DataSourceMetadata) *tfprotov5
 	}
 }
 
-func ValidateDataSourceConfigRequest(in *tfplugin5.ValidateDataSourceConfig_Request) *tfprotov5.ValidateDataSourceConfigRequest {
-	if in == nil {
-		return nil
-	}
-
-	resp := &tfprotov5.ValidateDataSourceConfigRequest{
-		Config:   DynamicValue(in.Config),
-		TypeName: in.TypeName,
-	}
-
-	return resp
-}
-
 func ValidateDataSourceConfigResponse(in *tfplugin5.ValidateDataSourceConfig_Response) (*tfprotov5.ValidateDataSourceConfigResponse, error) {
 	diags, err := Diagnostics(in.Diagnostics)
 	if err != nil {
@@ -36,21 +23,6 @@ func ValidateDataSourceConfigResponse(in *tfplugin5.ValidateDataSourceConfig_Res
 	return &tfprotov5.ValidateDataSourceConfigResponse{
 		Diagnostics: diags,
 	}, nil
-}
-
-func ReadDataSourceRequest(in *tfplugin5.ReadDataSource_Request) *tfprotov5.ReadDataSourceRequest {
-	if in == nil {
-		return nil
-	}
-
-	resp := &tfprotov5.ReadDataSourceRequest{
-		Config:             DynamicValue(in.Config),
-		ProviderMeta:       DynamicValue(in.ProviderMeta),
-		TypeName:           in.TypeName,
-		ClientCapabilities: ReadDataSourceClientCapabilities(in.ClientCapabilities),
-	}
-
-	return resp
 }
 
 func ReadDataSourceResponse(in *tfplugin5.ReadDataSource_Response) (*tfprotov5.ReadDataSourceResponse, error) {

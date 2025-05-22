@@ -3,6 +3,8 @@
 package typ
 
 import (
+	"time"
+
 	tfjson "github.com/hashicorp/terraform-json"
 	"github.com/zclconf/go-cty/cty"
 )
@@ -31,6 +33,22 @@ type GetProviderSchemaResponse struct {
 
 	// DataSourceTypesCty map the data source type name to the cty type of that type's schema.
 	DataSourcesCty map[string]cty.Type
+
+	// EphemeralResourceTypes maps the name of an ephemeral resource type
+	// to its schema.
+	EphemeralResourceTypes map[string]tfjson.Schema
+
+	// EphemeralResourceTypesCty maps the name of an ephemeral resource type
+	// to the cty type of its schema.
+	EphemeralResourceTypesCty map[string]cty.Type
+
+	// ListResourceTypes maps the name of an ephemeral resource type to its
+	// schema.
+	ListResourceTypes map[string]tfjson.Schema
+
+	// ListResourceTypes maps the name of an ephemeral resource type to the
+	// cty type of its schema.
+	ListResourceTypesCty map[string]cty.Type
 
 	// Functions maps from local function name (not including an namespace
 	// prefix) to the declaration of a function.
@@ -68,6 +86,10 @@ type ClientCapabilities struct {
 	// The deferral_allowed capability signals that the client is able to
 	// handle deferred responses from the provider.
 	DeferralAllowed bool
+
+	// The write_only_attributes_allowed capability signals that the client
+	// is able to handle write_only attributes for managed resources.
+	WriteOnlyAttributesAllowed bool
 }
 
 type ValidateProviderConfigRequest struct {
@@ -87,6 +109,9 @@ type ValidateResourceConfigRequest struct {
 	// Config is the configuration value to validate, which may contain unknown
 	// values.
 	Config cty.Value
+
+	// ClientCapabilities contains information about the client's capabilities.
+	ClientCapabilities ClientCapabilities
 }
 
 type ValidateResourceConfigResponse struct {
@@ -161,6 +186,9 @@ type ReadResourceRequest struct {
 
 	// ClientCapabilities contains information about the client's capabilities.
 	ClientCapabilities ClientCapabilities
+
+	// CurrentIdentity is the current identity data of the resource.
+	CurrentIdentity cty.Value
 }
 
 // DeferredReason is a string that describes why a resource was deferred.
@@ -211,6 +239,10 @@ type ReadResourceResponse struct {
 	// Deferred if present signals that the provider was not able to fully
 	// complete this operation and a susequent run is required.
 	Deferred *Deferred
+
+	// Identity is the object-typed value representing the identity of the remote
+	// object within Terraform.
+	Identity cty.Value
 }
 
 type PlanResourceChangeRequest struct {
@@ -244,6 +276,9 @@ type PlanResourceChangeRequest struct {
 
 	// ClientCapabilities contains information about the client's capabilities.
 	ClientCapabilities ClientCapabilities
+
+	// PriorIdentity is the current identity data of the resource.
+	PriorIdentity cty.Value
 }
 
 type PlanResourceChangeResponse struct {
@@ -270,6 +305,9 @@ type PlanResourceChangeResponse struct {
 	// Deferred if present signals that the provider was not able to fully
 	// complete this operation and a susequent run is required.
 	Deferred *Deferred
+
+	// PlannedIdentity is the planned identity data of the resource.
+	PlannedIdentity cty.Value
 }
 
 type ApplyResourceChangeRequest struct {
@@ -297,6 +335,9 @@ type ApplyResourceChangeRequest struct {
 	// each provider, and it should not be used without coordination with
 	// HashiCorp. It is considered experimental and subject to change.
 	ProviderMeta cty.Value
+
+	// PlannedIdentity is the planned identity data of the resource.
+	PlannedIdentity cty.Value
 }
 
 type ApplyResourceChangeResponse struct {
@@ -315,6 +356,9 @@ type ApplyResourceChangeResponse struct {
 	// otherwise fail due to this imprecise mapping. No other provider or SDK
 	// implementation is permitted to set this.
 	LegacyTypeSystem bool
+
+	// NewIdentity is the new identity data of the resource.
+	NewIdentity cty.Value
 }
 
 type ImportResourceStateRequest struct {
@@ -327,6 +371,9 @@ type ImportResourceStateRequest struct {
 
 	// ClientCapabilities contains information about the client's capabilities.
 	ClientCapabilities ClientCapabilities
+
+	// Identity is the identity data of the resource.
+	Identity cty.Value
 }
 
 type ImportResourceStateResponse struct {
@@ -358,6 +405,9 @@ type ImportedResource struct {
 	// Private is an opaque blob that will be stored in state along with the
 	// resource. It is intended only for interpretation by the provider itself.
 	Private []byte
+
+	// Identity is the identity data of the resource.
+	Identity cty.Value
 }
 
 type MoveResourceStateRequest struct {
@@ -385,6 +435,9 @@ type MoveResourceStateRequest struct {
 	// TargetTypeName is the name of the resource type that the resource is
 	// being moved to.
 	TargetTypeName string
+
+	// SourceIdentity is the identity data of the resource that is being moved.
+	SourceIdentity []byte
 }
 
 type MoveResourceStateResponse struct {
@@ -395,6 +448,9 @@ type MoveResourceStateResponse struct {
 	// TargetPrivate is the private state of the resource after it has been
 	// moved to the new resource type.
 	TargetPrivate []byte
+
+	// TargetIdentity is the identity data of the resource that is being moved.
+	TargetIdentity cty.Value
 }
 
 type ReadDataSourceRequest struct {
@@ -455,4 +511,179 @@ type CallFunctionResponse struct {
 	// of function.ArgError from the go-cty package to specify a problem with a
 	// specific argument.
 	Err error
+}
+
+type GetResourceIdentitySchemasResponse struct {
+	// IdentityTypes map the resource type name to that type's identity schema.
+	IdentityTypes map[string]IdentitySchema
+}
+
+type IdentitySchema struct {
+	Version int64
+
+	Body *tfjson.SchemaBlockType
+}
+
+type ValidateEphemeralResourceConfigRequest struct {
+	// TypeName is the name of the data source type to validate.
+	TypeName string
+
+	// Config is the configuration value to validate, which may contain unknown
+	// values.
+	Config cty.Value
+}
+
+type ValidateListResourceConfigRequest struct {
+	// TypeName is the name of the list resource type to validate.
+	TypeName string
+
+	// Config is the configuration value to validate, which may contain unknown
+	// values.
+	Config cty.Value
+}
+
+type UpgradeResourceIdentityRequest struct {
+	// TypeName is the name of the resource type being upgraded
+	TypeName string
+
+	// Version is version of the schema that created the current identity.
+	Version int64
+
+	// RawIdentityJSON contains the identity that needs to be
+	// upgraded to match the current schema version.
+	RawIdentityJSON []byte
+}
+
+type UpgradeResourceIdentityResponse struct {
+	// UpgradedState is the newly upgraded resource identity.
+	UpgradedIdentity cty.Value
+}
+
+type OpenEphemeralResourceRequest struct {
+	// TypeName is the type of ephemeral resource to open. This should
+	// only be one of the type names previously reported in the provider's
+	// schema.
+	TypeName string
+
+	// Config is an object-typed value representing the configuration for
+	// the ephemeral resource instance that the caller is trying to open.
+	//
+	// The object type of this value always conforms to the resource type
+	// schema's implied type, and uses null values to represent attributes
+	// that were not explicitly assigned in the configuration block.
+	// Computed-only attributes are always null in the configuration, because
+	// they can be set only in the response.
+	Config cty.Value
+
+	// ClientCapabilities contains information about the client's capabilities.
+	ClientCapabilities ClientCapabilities
+}
+
+// OpenEphemeralResourceRequest represents the response from an OpenEphemeralResource
+// operation on a provider.
+type OpenEphemeralResourceResponse struct {
+	// Deferred, if present, signals that the provider doesn't have enough
+	// information to open this ephemeral resource instance.
+	//
+	// This implies that any other side-effect-performing object must have its
+	// planning deferred if its planning operation indirectly depends on this
+	// ephemeral resource result. For example, if a provider configuration
+	// refers to an ephemeral resource whose opening is deferred then the
+	// affected provider configuration must not be instantiated and any resource
+	// instances that belong to it must have their planning immediately
+	// deferred.
+	Deferred *Deferred
+
+	// Result is an object-typed value representing the newly-opened session
+	// with the opened ephemeral object.
+	//
+	// The object type of this value always conforms to the resource type
+	// schema's implied type. Unknown values are forbidden unless the Deferred
+	// field is set, in which case the Result represents the provider's best
+	// approximation of the final object using unknown values in any location
+	// where a final value cannot be predicted.
+	Result cty.Value
+
+	// Private is any internal data needed by the provider to perform a
+	// subsequent [Interface.CloseEphemeralResource] request for the same object. The
+	// provider may choose any encoding format to represent the needed data,
+	// because Terraform Core treats this field as opaque.
+	//
+	// Providers should aim to keep this data relatively compact to minimize
+	// overhead. Although Terraform Core does not enforce a specific limit just
+	// for this field, it would be very unusual for the internal context to be
+	// more than 256 bytes in size, and in most cases it should be on the order
+	// of only tens of bytes. For example, a lease ID for the remote system is a
+	// reasonable thing to encode here.
+	//
+	// Because ephemeral resource instances never outlive a single Terraform
+	// Core phase, it's guaranteed that a CloseEphemeralResource request will be
+	// received by exactly the same plugin instance that returned this value,
+	// and so it's valid for this to refer to in-memory state belonging to the
+	// provider instance.
+	Private []byte
+
+	// RenewAt, if non-zero, signals that the opened object has an inherent
+	// expiration time and so must be "renewed" if Terraform needs to use it
+	// beyond that expiration time.
+	//
+	// If a provider sets this field then it may receive a subsequent
+	// Interface.RenewEphemeralResource call, if Terraform expects to need the
+	// object beyond the expiration time.
+	RenewAt time.Time
+}
+
+type RenewEphemeralResourceRequest struct {
+	// TypeName is the type of ephemeral resource being renewed. This should
+	// only be one of the type names previously sent in a successful
+	// [OpenEphemeralResourceRequest].
+	TypeName string
+
+	// Private echoes verbatim the value from the field of the same
+	// name from the most recent [EphemeralRenew] object, received from either
+	// an [OpenEphemeralResourceResponse] or a [RenewEphemeralResourceResponse] object.
+	Private []byte
+}
+
+// RenewEphemeralResourceRequest represents the response from a RenewEphemeralResource
+// operation on a provider.
+type RenewEphemeralResourceResponse struct {
+	// RenewAt, if non-zero, describes a new expiration deadline for the
+	// object, possibly causing a further call to [Interface.RenewEphemeralResource]
+	// if Terraform needs to exceed the updated deadline.
+	//
+	// If this is not set then Terraform Core will not make any further
+	// renewal requests for the remaining life of the object.
+	RenewAt time.Time
+
+	// Private is any internal data needed by the provider to
+	// perform a subsequent [Interface.RenewEphemeralResource] request. The provider
+	// may choose any encoding format to represent the needed data, because
+	// Terraform Core treats this field as opaque.
+	Private []byte
+}
+
+// CloseEphemeralResourceRequest represents the arguments for the CloseEphemeralResource
+// operation on a provider.
+type CloseEphemeralResourceRequest struct {
+	// TypeName is the type of ephemeral resource being closed. This should
+	// only be one of the type names previously sent in a successful
+	// [OpenEphemeralResourceRequest].
+	TypeName string
+
+	// Private echoes verbatim the value from the field of the same
+	// name from the corresponding [OpenEphemeralResourceResponse] object.
+	Private []byte
+}
+
+type ListResourceRequest struct {
+	// TypeName is the name of the resource type being read.
+	TypeName string
+
+	// Config is the block body for the list resource.
+	Config cty.Value
+
+	// IncludeResourceObject can be set to true when a provider should include
+	// the full resource object for each result
+	IncludeResourceObject bool
 }

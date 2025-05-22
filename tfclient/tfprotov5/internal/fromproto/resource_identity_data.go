@@ -5,14 +5,13 @@ import (
 	"github.com/magodo/terraform-client-go/tfclient/tfprotov5/internal/tfplugin5"
 )
 
-func RawState(in *tfplugin5.RawState) *tfprotov5.RawState {
+func ResourceIdentityData(in *tfplugin5.ResourceIdentityData) *tfprotov5.ResourceIdentityData {
 	if in == nil {
 		return nil
 	}
 
-	resp := &tfprotov5.RawState{
-		JSON:    in.Json,
-		Flatmap: in.Flatmap,
+	resp := &tfprotov5.ResourceIdentityData{
+		IdentityData: DynamicValue(in.IdentityData),
 	}
 
 	return resp

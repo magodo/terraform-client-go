@@ -51,6 +51,7 @@ func SchemaAttribute(in *tfplugin5.Schema_Attribute) (*tfprotov5.SchemaAttribute
 		Sensitive:       in.Sensitive,
 		DescriptionKind: StringKind(in.DescriptionKind),
 		Deprecated:      in.Deprecated,
+		WriteOnly:       in.WriteOnly,
 	}
 	typ, err := tftypes.ParseJSONType(in.Type) //nolint:staticcheck
 	if err != nil {

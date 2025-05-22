@@ -9,5 +9,11 @@ func RawState(in *tfprotov5.RawState) *tfplugin5.RawState {
 	if in == nil {
 		return nil
 	}
-	return &tfplugin5.RawState{Json: in.JSON, Flatmap: in.Flatmap}
+
+	resp := &tfplugin5.RawState{
+		Json:    in.JSON,
+		Flatmap: in.Flatmap,
+	}
+
+	return resp
 }

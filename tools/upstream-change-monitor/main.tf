@@ -41,6 +41,8 @@ locals {
     "tfprotov5/internal/fromproto/state.go",
     "tfprotov5/internal/fromproto/string_kind.go",
     "tfprotov5/internal/fromproto/types.go",
+    "tfprotov5/internal/fromproto/client_capabilities.go",
+    "tfprotov5/internal/fromproto/resource_identity_data.go",
 
     "tfprotov5/internal/toproto/attribute_path.go",
     "tfprotov5/internal/toproto/data_source.go",
@@ -53,6 +55,9 @@ locals {
     "tfprotov5/internal/toproto/server_capabilities.go",
     "tfprotov5/internal/toproto/state.go",
     "tfprotov5/internal/toproto/string_kind.go",
+    "tfprotov5/internal/toproto/ephemeral_resource.go",
+    "tfprotov5/internal/toproto/timestamp.go",
+    "tfprotov5/internal/toproto/resource_identity_data.go",
 
     "tfprotov6/internal/fromproto/attribute_path.go",
     "tfprotov6/internal/fromproto/data_source.go",
@@ -65,6 +70,8 @@ locals {
     "tfprotov6/internal/fromproto/state.go",
     "tfprotov6/internal/fromproto/string_kind.go",
     "tfprotov6/internal/fromproto/types.go",
+    "tfprotov6/internal/fromproto/client_capabilities.go",
+    "tfprotov6/internal/fromproto/resource_identity_data.go",
 
     "tfprotov6/internal/toproto/attribute_path.go",
     "tfprotov6/internal/toproto/data_source.go",
@@ -77,6 +84,9 @@ locals {
     "tfprotov6/internal/toproto/server_capabilities.go",
     "tfprotov6/internal/toproto/state.go",
     "tfprotov6/internal/toproto/string_kind.go",
+    "tfprotov6/internal/toproto/ephemeral_resource.go",
+    "tfprotov6/internal/toproto/timestamp.go",
+    "tfprotov6/internal/toproto/resource_identity_data.go",
   ])
   terraform-commit = "v1.10.0-alpha20240730"
   terraform = toset([

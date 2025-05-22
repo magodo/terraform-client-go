@@ -54,6 +54,7 @@ func SchemaAttribute(in *tfplugin6.Schema_Attribute) (*tfprotov6.SchemaAttribute
 		Sensitive:       in.Sensitive,
 		DescriptionKind: StringKind(in.DescriptionKind),
 		Deprecated:      in.Deprecated,
+		WriteOnly:       in.WriteOnly,
 	}
 
 	if in.Type != nil {

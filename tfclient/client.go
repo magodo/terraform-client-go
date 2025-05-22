@@ -5,14 +5,24 @@ package tfclient
 import (
 	"context"
 
+	"github.com/magodo/terraform-client-go/tfclient/tfprotov5/tf5client"
+	"github.com/magodo/terraform-client-go/tfclient/tfprotov6/tf6client"
 	"github.com/magodo/terraform-client-go/tfclient/typ"
 )
+
+var _ Client = &tf5client.Client{}
+var _ Client = &tf6client.Client{}
 
 // Client represents the set of methods required for a complete resource
 // provider plugin.
 type Client interface {
 	// GetProviderSchema returns the complete schema for the provider.
 	GetProviderSchema() (*typ.GetProviderSchemaResponse, typ.Diagnostics)
+
+	// GetResourceIdentitySchemas returns the identity schemas for all managed resources
+	// for the provider. Usually you don't need to call this method directly as GetProviderSchema
+	// will merge the identity schemas into the provider schema.
+	GetResourceIdentitySchemas() *typ.GetResourceIdentitySchemasResponse
 
 	// ValidateProviderConfig allows the provider to validate the configuration.
 	// The ValidateProviderConfigResponse.PreparedConfig field is unused. The
@@ -28,11 +38,25 @@ type Client interface {
 	// configuration values.
 	ValidateDataResourceConfig(context.Context, typ.ValidateDataResourceConfigRequest) (*typ.ValidateDataResourceConfigResponse, typ.Diagnostics)
 
+	// ValidateEphemeralResourceConfig allows the provider to validate the
+	// ephemeral resource configuration values.
+	ValidateEphemeralResourceConfig(context.Context, typ.ValidateEphemeralResourceConfigRequest) typ.Diagnostics
+
+	// ValidateListResourceConfig allows the provider to validate the list
+	// resource configuration values.
+	ValidateListResourceConfig(context.Context, typ.ValidateListResourceConfigRequest) typ.Diagnostics
+
 	// UpgradeResourceState is called when the state loader encounters an
 	// instance state whose schema version is less than the one reported by the
 	// currently-used version of the corresponding provider, and the upgraded
 	// result is used for any further processing.
 	UpgradeResourceState(context.Context, typ.UpgradeResourceStateRequest) (*typ.UpgradeResourceStateResponse, typ.Diagnostics)
+
+	// UpgradeResourceIdentity is called when the state loader encounters an
+	// instance identity whose schema version is less than the one reported by
+	// the currently-used version of the corresponding provider, and the upgraded
+	// result is used for any further processing.
+	UpgradeResourceIdentity(context.Context, typ.UpgradeResourceIdentityRequest) (*typ.UpgradeResourceIdentityResponse, typ.Diagnostics)
 
 	// ConfigureProvider configures and initialized the provider.
 	ConfigureProvider(context.Context, typ.ConfigureProviderRequest) (*typ.ConfigureProviderResponse, typ.Diagnostics)
@@ -70,6 +94,15 @@ type Client interface {
 
 	// ReadDataSource returns the data source's current state.
 	ReadDataSource(context.Context, typ.ReadDataSourceRequest) (*typ.ReadDataSourceResponse, typ.Diagnostics)
+
+	// OpenEphemeralResource opens an ephemeral resource instance.
+	OpenEphemeralResource(context.Context, typ.OpenEphemeralResourceRequest) (*typ.OpenEphemeralResourceResponse, typ.Diagnostics)
+	// RenewEphemeralResource extends the validity of a previously-opened ephemeral
+	// resource instance.
+	RenewEphemeralResource(context.Context, typ.RenewEphemeralResourceRequest) (*typ.RenewEphemeralResourceResponse, typ.Diagnostics)
+	// CloseEphemeralResource closes an ephemeral resource instance, with the intent
+	// of rendering it invalid as soon as possible.
+	CloseEphemeralResource(context.Context, typ.CloseEphemeralResourceRequest) typ.Diagnostics
 
 	// CallFunction calls a provider-contributed function.
 	CallFunction(context.Context, typ.CallFunctionRequest) (*typ.CallFunctionResponse, typ.Diagnostics)

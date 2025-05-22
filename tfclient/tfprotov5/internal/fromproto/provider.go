@@ -5,16 +5,6 @@ import (
 	"github.com/magodo/terraform-client-go/tfclient/tfprotov5/internal/tfplugin5"
 )
 
-func GetMetadataRequest(in *tfplugin5.GetMetadata_Request) *tfprotov5.GetMetadataRequest {
-	if in == nil {
-		return nil
-	}
-
-	resp := &tfprotov5.GetMetadataRequest{}
-
-	return resp
-}
-
 func GetMetadataResponse(in *tfplugin5.GetMetadata_Response) (*tfprotov5.GetMetadataResponse, error) {
 	if in == nil {
 		return nil, nil
@@ -28,11 +18,18 @@ func GetMetadataResponse(in *tfplugin5.GetMetadata_Response) (*tfprotov5.GetMeta
 	resp := &tfprotov5.GetMetadataResponse{
 		ServerCapabilities: ServerCapabilities(in.ServerCapabilities),
 		Diagnostics:        diags,
+		EphemeralResources: make([]tfprotov5.EphemeralResourceMetadata, 0, len(in.EphemeralResources)),
 	}
 
 	for _, datasource := range in.DataSources {
 		if v := DataSourceMetadata(datasource); v != nil {
 			resp.DataSources = append(resp.DataSources, *v)
+		}
+	}
+
+	for _, ephemeralResource := range in.EphemeralResources {
+		if v := GetMetadata_EphemeralResourceMetadata(ephemeralResource); v != nil {
+			resp.EphemeralResources = append(resp.EphemeralResources, *v)
 		}
 	}
 
@@ -49,16 +46,6 @@ func GetMetadataResponse(in *tfplugin5.GetMetadata_Response) (*tfprotov5.GetMeta
 	}
 
 	return resp, nil
-}
-
-func GetProviderSchemaRequest(in *tfplugin5.GetProviderSchema_Request) *tfprotov5.GetProviderSchemaRequest {
-	if in == nil {
-		return nil
-	}
-
-	resp := &tfprotov5.GetProviderSchemaRequest{}
-
-	return resp
 }
 
 func GetProviderSchemaResponse(in *tfplugin5.GetProviderSchema_Response) (*tfprotov5.GetProviderSchemaResponse, error) {
@@ -93,6 +80,15 @@ func GetProviderSchemaResponse(in *tfplugin5.GetProviderSchema_Response) (*tfpro
 		dataSourceSchemas[k] = schema
 	}
 
+	ephemeralResourceSchemas := make(map[string]*tfprotov5.Schema, len(in.EphemeralResourceSchemas))
+	for k, v := range in.EphemeralResourceSchemas {
+		schema, err := Schema(v)
+		if err != nil {
+			return nil, err
+		}
+		ephemeralResourceSchemas[k] = schema
+	}
+
 	funcs, err := Functions(in.Functions)
 	if err != nil {
 		return nil, err
@@ -104,28 +100,42 @@ func GetProviderSchemaResponse(in *tfplugin5.GetProviderSchema_Response) (*tfpro
 	}
 
 	resp := &tfprotov5.GetProviderSchemaResponse{
-		ServerCapabilities: ServerCapabilities(in.ServerCapabilities),
-		Provider:           provider,
-		ProviderMeta:       providerMeta,
-		ResourceSchemas:    resourceSchemas,
-		DataSourceSchemas:  dataSourceSchemas,
-		Functions:          funcs,
-		Diagnostics:        diags,
+		ServerCapabilities:       ServerCapabilities(in.ServerCapabilities),
+		Provider:                 provider,
+		ProviderMeta:             providerMeta,
+		ResourceSchemas:          resourceSchemas,
+		DataSourceSchemas:        dataSourceSchemas,
+		Functions:                funcs,
+		EphemeralResourceSchemas: ephemeralResourceSchemas,
+		Diagnostics:              diags,
 	}
 
 	return resp, nil
 }
 
-func PrepareProviderConfigRequest(in *tfplugin5.PrepareProviderConfig_Request) *tfprotov5.PrepareProviderConfigRequest {
+func GetResourceIdentitySchemasResponse(in *tfplugin5.GetResourceIdentitySchemas_Response) (*tfprotov5.GetResourceIdentitySchemasResponse, error) {
 	if in == nil {
-		return nil
+		return nil, nil
 	}
 
-	resp := &tfprotov5.PrepareProviderConfigRequest{
-		Config: DynamicValue(in.Config),
+	diags, err := Diagnostics(in.Diagnostics)
+	if err != nil {
+		return nil, err
 	}
 
-	return resp
+	resp := &tfprotov5.GetResourceIdentitySchemasResponse{
+		Diagnostics:     diags,
+		IdentitySchemas: make(map[string]*tfprotov5.ResourceIdentitySchema, len(in.IdentitySchemas)),
+	}
+
+	for name, schema := range in.IdentitySchemas {
+		resp.IdentitySchemas[name], err = ResourceIdentitySchema(schema)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return resp, nil
 }
 
 func PrepareProviderConfigResponse(in *tfplugin5.PrepareProviderConfig_Response) (*tfprotov5.PrepareProviderConfigResponse, error) {
@@ -146,20 +156,6 @@ func PrepareProviderConfigResponse(in *tfplugin5.PrepareProviderConfig_Response)
 	return resp, nil
 }
 
-func ConfigureProviderRequest(in *tfplugin5.Configure_Request) *tfprotov5.ConfigureProviderRequest {
-	if in == nil {
-		return nil
-	}
-
-	resp := &tfprotov5.ConfigureProviderRequest{
-		Config:             DynamicValue(in.Config),
-		TerraformVersion:   in.TerraformVersion,
-		ClientCapabilities: ConfigureProviderClientCapabilities(in.ClientCapabilities),
-	}
-
-	return resp
-}
-
 func ConfigureProviderResponse(in *tfplugin5.Configure_Response) (*tfprotov5.ConfigureProviderResponse, error) {
 	diags, err := Diagnostics(in.Diagnostics)
 	if err != nil {
@@ -168,16 +164,6 @@ func ConfigureProviderResponse(in *tfplugin5.Configure_Response) (*tfprotov5.Con
 	return &tfprotov5.ConfigureProviderResponse{
 		Diagnostics: diags,
 	}, nil
-}
-
-func StopProviderRequest(in *tfplugin5.Stop_Request) *tfprotov5.StopProviderRequest {
-	if in == nil {
-		return nil
-	}
-
-	resp := &tfprotov5.StopProviderRequest{}
-
-	return resp
 }
 
 func StopProviderResponse(in *tfplugin5.Stop_Response) *tfprotov5.StopProviderResponse {

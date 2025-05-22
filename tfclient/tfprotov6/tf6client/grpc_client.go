@@ -232,3 +232,81 @@ func (c *GRPCClient) MoveResourceState(ctx context.Context, req *tfprotov6.MoveR
 	}
 	return ret, nil
 }
+
+func (c *GRPCClient) GetResourceIdentitySchemas(ctx context.Context, req *tfprotov6.GetResourceIdentitySchemasRequest) (*tfprotov6.GetResourceIdentitySchemasResponse, error) {
+	r := toproto.GetResourceIdentitySchemas_Request(req)
+	resp, err := c.client.GetResourceIdentitySchemas(ctx, r)
+	if err != nil {
+		return nil, err
+	}
+	ret, err := fromproto.GetResourceIdentitySchemasResponse(resp)
+	if err != nil {
+		return nil, err
+	}
+	return ret, nil
+}
+
+func (c *GRPCClient) UpgradeResourceIdentity(ctx context.Context, req *tfprotov6.UpgradeResourceIdentityRequest) (*tfprotov6.UpgradeResourceIdentityResponse, error) {
+	r := toproto.UpgradeResourceIdentity_Request(req)
+	resp, err := c.client.UpgradeResourceIdentity(ctx, r)
+	if err != nil {
+		return nil, err
+	}
+	ret, err := fromproto.UpgradeResourceIdentityResponse(resp)
+	if err != nil {
+		return nil, err
+	}
+	return ret, nil
+}
+
+func (c *GRPCClient) ValidateEphemeralResourceConfig(ctx context.Context, req *tfprotov6.ValidateEphemeralResourceConfigRequest) (*tfprotov6.ValidateEphemeralResourceConfigResponse, error) {
+	r := toproto.ValidateEphemeralResourceConfigRequest(req)
+	resp, err := c.client.ValidateEphemeralResourceConfig(ctx, r)
+	if err != nil {
+		return nil, err
+	}
+	ret, err := fromproto.ValidateEphemeralResourceConfig_Response(resp)
+	if err != nil {
+		return nil, err
+	}
+	return ret, nil
+}
+
+func (c *GRPCClient) OpenEphemeralResource(ctx context.Context, req *tfprotov6.OpenEphemeralResourceRequest) (*tfprotov6.OpenEphemeralResourceResponse, error) {
+	r := toproto.OpenEphemeralResourceRequest(req)
+	resp, err := c.client.OpenEphemeralResource(ctx, r)
+	if err != nil {
+		return nil, err
+	}
+	ret, err := fromproto.OpenEphemeralResource_Response(resp)
+	if err != nil {
+		return nil, err
+	}
+	return ret, nil
+}
+
+func (c *GRPCClient) RenewEphemeralResource(ctx context.Context, req *tfprotov6.RenewEphemeralResourceRequest) (*tfprotov6.RenewEphemeralResourceResponse, error) {
+	r := toproto.RenewEphemeralResourceRequest(req)
+	resp, err := c.client.RenewEphemeralResource(ctx, r)
+	if err != nil {
+		return nil, err
+	}
+	ret, err := fromproto.RenewEphemeralResource_Response(resp)
+	if err != nil {
+		return nil, err
+	}
+	return ret, nil
+}
+
+func (c *GRPCClient) CloseEphemeralResource(ctx context.Context, req *tfprotov6.CloseEphemeralResourceRequest) (*tfprotov6.CloseEphemeralResourceResponse, error) {
+	r := toproto.CloseEphemeralResourceRequest(req)
+	resp, err := c.client.CloseEphemeralResource(ctx, r)
+	if err != nil {
+		return nil, err
+	}
+	ret, err := fromproto.CloseEphemeralResource_Response(resp)
+	if err != nil {
+		return nil, err
+	}
+	return ret, nil
+}

@@ -23,19 +23,6 @@ func CallFunction_Request(in *tfprotov5.CallFunctionRequest) *tfplugin5.CallFunc
 	return req
 }
 
-func CallFunction_Response(in *tfprotov5.CallFunctionResponse) *tfplugin5.CallFunction_Response {
-	if in == nil {
-		return nil
-	}
-
-	resp := &tfplugin5.CallFunction_Response{
-		Error:  FunctionError(in.Error),
-		Result: DynamicValue(in.Result),
-	}
-
-	return resp
-}
-
 func Function(in *tfprotov5.Function) *tfplugin5.Function {
 	if in == nil {
 		return nil
@@ -95,23 +82,6 @@ func GetFunctions_Request(in *tfprotov5.GetFunctionsRequest) *tfplugin5.GetFunct
 	req := &tfplugin5.GetFunctions_Request{}
 
 	return req
-}
-
-func GetFunctions_Response(in *tfprotov5.GetFunctionsResponse) *tfplugin5.GetFunctions_Response {
-	if in == nil {
-		return nil
-	}
-
-	resp := &tfplugin5.GetFunctions_Response{
-		Diagnostics: Diagnostics(in.Diagnostics),
-		Functions:   make(map[string]*tfplugin5.Function, len(in.Functions)),
-	}
-
-	for name, function := range in.Functions {
-		resp.Functions[name] = Function(function)
-	}
-
-	return resp
 }
 
 func GetMetadata_FunctionMetadata(in *tfprotov5.FunctionMetadata) *tfplugin5.GetMetadata_FunctionMetadata {

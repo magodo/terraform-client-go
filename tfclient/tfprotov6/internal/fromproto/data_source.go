@@ -15,19 +15,6 @@ func DataSourceMetadata(in *tfplugin6.GetMetadata_DataSourceMetadata) *tfprotov6
 	}
 }
 
-func ValidateDataResourceConfigRequest(in *tfplugin6.ValidateDataResourceConfig_Request) *tfprotov6.ValidateDataResourceConfigRequest {
-	if in == nil {
-		return nil
-	}
-
-	resp := &tfprotov6.ValidateDataResourceConfigRequest{
-		Config:   DynamicValue(in.Config),
-		TypeName: in.TypeName,
-	}
-
-	return resp
-}
-
 func ValidateDataResourceConfigResponse(in *tfplugin6.ValidateDataResourceConfig_Response) (*tfprotov6.ValidateDataResourceConfigResponse, error) {
 	if in == nil {
 		return nil, nil
@@ -43,21 +30,6 @@ func ValidateDataResourceConfigResponse(in *tfplugin6.ValidateDataResourceConfig
 	}
 
 	return resp, nil
-}
-
-func ReadDataSourceRequest(in *tfplugin6.ReadDataSource_Request) *tfprotov6.ReadDataSourceRequest {
-	if in == nil {
-		return nil
-	}
-
-	resp := &tfprotov6.ReadDataSourceRequest{
-		Config:             DynamicValue(in.Config),
-		ProviderMeta:       DynamicValue(in.ProviderMeta),
-		TypeName:           in.TypeName,
-		ClientCapabilities: ReadDataSourceClientCapabilities(in.ClientCapabilities),
-	}
-
-	return resp
 }
 
 func ReadDataSourceResponse(in *tfplugin6.ReadDataSource_Response) (*tfprotov6.ReadDataSourceResponse, error) {

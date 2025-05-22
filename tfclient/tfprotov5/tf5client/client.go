@@ -18,6 +18,8 @@ import (
 	"github.com/zclconf/go-cty/cty/function"
 	ctyjson "github.com/zclconf/go-cty/cty/json"
 	"github.com/zclconf/go-cty/cty/msgpack"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // Client handles the client, or core side of the plugin rpc connection.
@@ -41,6 +43,7 @@ type Client struct {
 }
 
 func New(pluginClient *plugin.Client, grpcClient tfprotov5.ProviderServer, schema *typ.GetProviderSchemaResponse) (*Client, error) {
+	ctx := context.Background()
 	c := &Client{
 		pluginClient: pluginClient,
 		client:       grpcClient,
@@ -51,7 +54,7 @@ func New(pluginClient *plugin.Client, grpcClient tfprotov5.ProviderServer, schem
 		return c, nil
 	}
 
-	resp, err := grpcClient.GetProviderSchema(context.Background(), &tfprotov5.GetProviderSchemaRequest{})
+	resp, err := grpcClient.GetProviderSchema(ctx, &tfprotov5.GetProviderSchemaRequest{})
 	if err != nil {
 		return nil, err
 	}
@@ -60,22 +63,44 @@ func New(pluginClient *plugin.Client, grpcClient tfprotov5.ProviderServer, schem
 	}
 
 	schemas := typ.GetProviderSchemaResponse{
-		ResourceTypes:    map[string]tfjson.Schema{},
-		ResourceTypesCty: map[string]cty.Type{},
-		DataSources:      map[string]tfjson.Schema{},
-		DataSourcesCty:   map[string]cty.Type{},
-		Functions:        map[string]typ.FunctionDecl{},
+		ResourceTypes:             map[string]tfjson.Schema{},
+		ResourceTypesCty:          map[string]cty.Type{},
+		DataSources:               map[string]tfjson.Schema{},
+		DataSourcesCty:            map[string]cty.Type{},
+		Functions:                 map[string]typ.FunctionDecl{},
+		EphemeralResourceTypes:    map[string]tfjson.Schema{},
+		EphemeralResourceTypesCty: map[string]cty.Type{},
+		ListResourceTypes:         map[string]tfjson.Schema{},
+		ListResourceTypesCty:      map[string]cty.Type{},
 		ServerCapabilities: typ.ServerCapabilities{
 			PlanDestroy: false,
 		},
 	}
+
+	identResp, err := grpcClient.GetResourceIdentitySchemas(ctx, new(tfprotov5.GetResourceIdentitySchemasRequest))
+	if err != nil {
+		if status.Code(err) == codes.Unimplemented {
+			// We don't treat this as an error if older providers don't implement this method,
+			// so we create an empty map for identity schemas
+			identResp = &tfprotov5.GetResourceIdentitySchemasResponse{
+				IdentitySchemas: map[string]*tfprotov5.ResourceIdentitySchema{},
+			}
+		} else {
+			return nil, err
+		}
+	}
+
+	if diags := convert.DecodeDiagnostics(identResp.Diagnostics); diags.HasErrors() {
+		return nil, diags.Err()
+	}
+
 	if resp.Provider != nil {
-		providerSchema := convert.ProtoToProviderSchema(resp.Provider)
+		providerSchema := convert.ProtoToProviderSchema(resp.Provider, nil)
 		schemas.Provider = providerSchema
 		schemas.ProviderCty = configschema.SchemaBlockImpliedType(providerSchema.Block)
 	}
 	if resp.ProviderMeta != nil {
-		providerMetaSchema := convert.ProtoToProviderSchema(resp.ProviderMeta)
+		providerMetaSchema := convert.ProtoToProviderSchema(resp.ProviderMeta, nil)
 		schemas.ProviderMeta = providerMetaSchema
 		schemas.ProviderMetaCty = configschema.SchemaBlockImpliedType(providerMetaSchema.Block)
 	}
@@ -83,15 +108,27 @@ func New(pluginClient *plugin.Client, grpcClient tfprotov5.ProviderServer, schem
 		schemas.ServerCapabilities.PlanDestroy = resp.ServerCapabilities.PlanDestroy
 	}
 	for name, schema := range resp.ResourceSchemas {
-		resourceSchema := convert.ProtoToProviderSchema(schema)
+		id := identResp.IdentitySchemas[name]
+		resourceSchema := convert.ProtoToProviderSchema(schema, id)
 		schemas.ResourceTypes[name] = resourceSchema
 		schemas.ResourceTypesCty[name] = configschema.SchemaBlockImpliedType(resourceSchema.Block)
 	}
 	for name, schema := range resp.DataSourceSchemas {
-		dataSourceSchema := convert.ProtoToProviderSchema(schema)
+		dataSourceSchema := convert.ProtoToProviderSchema(schema, nil)
 		schemas.DataSources[name] = dataSourceSchema
 		schemas.DataSourcesCty[name] = configschema.SchemaBlockImpliedType(dataSourceSchema.Block)
 	}
+	for name, ephem := range resp.EphemeralResourceSchemas {
+		ephemSchema := convert.ProtoToProviderSchema(ephem, nil)
+		schemas.EphemeralResourceTypes[name] = ephemSchema
+		schemas.EphemeralResourceTypesCty[name] = configschema.SchemaBlockImpliedType(ephemSchema.Block)
+	}
+	// TODO: Add this once terraform-plugin-go supports ListResourceSchema
+	// for name, list := range resp.ListResourceSchemas {
+	// 	listSchema := convert.ProtoToProviderSchema(list, nil)
+	// 	schemas.ListResourceTypes[name] = listSchema
+	// 	schemas.ListResourceTypesCty[name] = configschema.SchemaBlockImpliedType(listSchema.Block)
+	// }
 	for name, fun := range resp.Functions {
 		schemas.Functions[name], err = convert.FunctionDeclFromProto(fun)
 		if err != nil {
@@ -752,6 +789,41 @@ func (c *Client) CallFunction(ctx context.Context, request typ.CallFunctionReque
 	}
 	resp.Result = resultVal
 	return resp, nil
+}
+
+// GetResourceIdentitySchemas implements tfclient.Client.
+func (c *Client) GetResourceIdentitySchemas() *typ.GetResourceIdentitySchemasResponse {
+	panic("unimplemented")
+}
+
+// ValidateListResourceConfig implements tfclient.Client.
+func (c *Client) ValidateListResourceConfig(context.Context, typ.ValidateListResourceConfigRequest) typ.Diagnostics {
+	panic("unimplemented")
+}
+
+// UpgradeResourceIdentity implements tfclient.Client.
+func (c *Client) UpgradeResourceIdentity(context.Context, typ.UpgradeResourceIdentityRequest) (*typ.UpgradeResourceIdentityResponse, typ.Diagnostics) {
+	panic("unimplemented")
+}
+
+// ValidateEphemeralResourceConfig implements tfclient.Client.
+func (c *Client) ValidateEphemeralResourceConfig(context.Context, typ.ValidateEphemeralResourceConfigRequest) typ.Diagnostics {
+	panic("unimplemented")
+}
+
+// OpenEphemeralResource implements tfclient.Client.
+func (c *Client) OpenEphemeralResource(context.Context, typ.OpenEphemeralResourceRequest) (*typ.OpenEphemeralResourceResponse, typ.Diagnostics) {
+	panic("unimplemented")
+}
+
+// CloseEphemeralResource implements tfclient.Client.
+func (c *Client) CloseEphemeralResource(context.Context, typ.CloseEphemeralResourceRequest) typ.Diagnostics {
+	panic("unimplemented")
+}
+
+// RenewEphemeralResource implements tfclient.Client.
+func (c *Client) RenewEphemeralResource(context.Context, typ.RenewEphemeralResourceRequest) (*typ.RenewEphemeralResourceResponse, typ.Diagnostics) {
+	panic("unimplemented")
 }
 
 func (c *Client) Close() {
