@@ -195,6 +195,9 @@ func (c *Client) ValidateResourceConfig(ctx context.Context, request typ.Validat
 	resp, err := c.client.ValidateResourceTypeConfig(ctx, &tfprotov5.ValidateResourceTypeConfigRequest{
 		TypeName: request.TypeName,
 		Config:   &tfprotov5.DynamicValue{MsgPack: mp},
+		ClientCapabilities: &tfprotov5.ValidateResourceTypeConfigClientCapabilities{
+			WriteOnlyAttributesAllowed: request.ClientCapabilities.WriteOnlyAttributesAllowed,
+		},
 	})
 	if err != nil {
 		diags = append(diags, typ.RPCErrorDiagnostics(err)...)
@@ -345,6 +348,12 @@ func (c *Client) ReadResource(ctx context.Context, request typ.ReadResourceReque
 	var diags typ.Diagnostics
 	schema := c.schemas
 
+	resSchema, ok := schema.ResourceTypes[request.TypeName]
+	if !ok {
+		diags = append(diags, typ.ErrorDiagnostics("no schema", fmt.Errorf("unknown resource type %q", request.TypeName))...)
+		return nil, diags
+	}
+
 	resTyp, ok := schema.ResourceTypesCty[request.TypeName]
 	if !ok {
 		diags = append(diags, typ.ErrorDiagnostics("no schema", fmt.Errorf("unknown resource type %q", request.TypeName))...)
@@ -379,34 +388,69 @@ func (c *Client) ReadResource(ctx context.Context, request typ.ReadResourceReque
 		protoReq.ProviderMeta = &tfprotov5.DynamicValue{MsgPack: metaMP}
 	}
 
-	resp, err := c.client.ReadResource(ctx, protoReq)
+	if !request.CurrentIdentity.IsNull() {
+		if resSchema.Identity == nil {
+			diags = append(diags, typ.ErrorDiagnostics("identity type not found", fmt.Errorf("identity type not found for resoruce type %s", request.TypeName))...)
+			return nil, diags
+		}
+		currentIdentityMP, err := msgpack.Marshal(request.CurrentIdentity, configschema.SchemaNestedAttributeTypeImpliedType(resSchema.Identity))
+		if err != nil {
+			diags = append(diags, typ.ErrorDiagnostics("msgpach marshal", err)...)
+			return nil, diags
+		}
+		protoReq.CurrentIdentity = &tfprotov5.ResourceIdentityData{
+			IdentityData: &tfprotov5.DynamicValue{MsgPack: currentIdentityMP},
+		}
+	}
+
+	protoResp, err := c.client.ReadResource(ctx, protoReq)
 	if err != nil {
 		diags = append(diags, typ.RPCErrorDiagnostics(err)...)
 		return nil, diags
 	}
 
-	respDiags := convert.DecodeDiagnostics(resp.Diagnostics)
+	respDiags := convert.DecodeDiagnostics(protoResp.Diagnostics)
 	diags = append(diags, respDiags...)
 	if diags.HasErrors() {
 		return nil, diags
 	}
 
-	state, err := decodeDynamicValue(resp.NewState, resTyp)
+	state, err := decodeDynamicValue(protoResp.NewState, resTyp)
 	if err != nil {
 		diags = append(diags, typ.ErrorDiagnostics("decode dynamic value", err)...)
 		return nil, diags
 	}
 
-	return &typ.ReadResourceResponse{
+	resp := &typ.ReadResourceResponse{
 		NewState: state,
-		Private:  resp.Private,
-		Deferred: convert.ProtoToDeferred(resp.Deferred),
-	}, diags
+		Private:  protoResp.Private,
+		Deferred: convert.ProtoToDeferred(protoResp.Deferred),
+	}
+
+	if protoResp.NewIdentity != nil && protoResp.NewIdentity.IdentityData != nil {
+		if resSchema.Identity == nil {
+			diags = append(diags, typ.ErrorDiagnostics("unknown identity type", fmt.Errorf("unknown identity type %s", request.TypeName))...)
+			return nil, diags
+		}
+
+		resp.Identity, err = decodeDynamicValue(protoResp.NewIdentity.IdentityData, configschema.SchemaNestedAttributeTypeImpliedType(resSchema.Identity))
+		if err != nil {
+			diags = append(diags, typ.ErrorDiagnostics("decode dynamic value for identity data", err)...)
+		}
+	}
+
+	return resp, diags
 }
 
 func (c *Client) PlanResourceChange(ctx context.Context, request typ.PlanResourceChangeRequest) (*typ.PlanResourceChangeResponse, typ.Diagnostics) {
 	var diags typ.Diagnostics
 	schema := c.schemas
+
+	resSchema, ok := schema.ResourceTypes[request.TypeName]
+	if !ok {
+		diags = append(diags, typ.ErrorDiagnostics("no schema", fmt.Errorf("unknown resource type %q", request.TypeName))...)
+		return nil, diags
+	}
 
 	resTyp, ok := schema.ResourceTypesCty[request.TypeName]
 	if !ok {
@@ -417,14 +461,14 @@ func (c *Client) PlanResourceChange(ctx context.Context, request typ.PlanResourc
 	metaTyp := schema.ProviderMetaCty
 	capabilities := schema.ServerCapabilities
 
-	var response typ.PlanResourceChangeResponse
+	var resp typ.PlanResourceChangeResponse
 
 	// If the provider doesn't support planning a destroy operation, we can
 	// return immediately.
 	if request.ProposedNewState.IsNull() && !capabilities.PlanDestroy {
-		response.PlannedState = request.ProposedNewState
-		response.PlannedPrivate = request.PriorPrivate
-		return &response, nil
+		resp.PlannedState = request.ProposedNewState
+		resp.PlannedPrivate = request.PriorPrivate
+		return &resp, nil
 	}
 
 	priorMP, err := msgpack.Marshal(request.PriorState, resTyp)
@@ -471,6 +515,21 @@ func (c *Client) PlanResourceChange(ctx context.Context, request typ.PlanResourc
 		protoReq.ProviderMeta = &tfprotov5.DynamicValue{MsgPack: metaMP}
 	}
 
+	if !request.PriorIdentity.IsNull() {
+		if resSchema.Identity == nil {
+			diags = append(diags, typ.ErrorDiagnostics("identity type not found", fmt.Errorf("identity type not found for resoruce type %s", request.TypeName))...)
+			return nil, diags
+		}
+		priorIdentityMP, err := msgpack.Marshal(request.PriorIdentity, configschema.SchemaNestedAttributeTypeImpliedType(resSchema.Identity))
+		if err != nil {
+			diags = append(diags, typ.ErrorDiagnostics("msgpach marshal", err)...)
+			return nil, diags
+		}
+		protoReq.PriorIdentity = &tfprotov5.ResourceIdentityData{
+			IdentityData: &tfprotov5.DynamicValue{MsgPack: priorIdentityMP},
+		}
+	}
+
 	protoResp, err := c.client.PlanResourceChange(ctx, protoReq)
 	if err != nil {
 		diags = append(diags, typ.RPCErrorDiagnostics(err)...)
@@ -487,24 +546,42 @@ func (c *Client) PlanResourceChange(ctx context.Context, request typ.PlanResourc
 		diags = append(diags, typ.ErrorDiagnostics("decode dynamic value", err)...)
 		return nil, diags
 	}
-	response.PlannedState = state
+	resp.PlannedState = state
 
 	for _, p := range protoResp.RequiresReplace {
-		response.RequiresReplace = append(response.RequiresReplace, convert.DecodeAttributePath(p))
+		resp.RequiresReplace = append(resp.RequiresReplace, convert.DecodeAttributePath(p))
 	}
 
-	response.PlannedPrivate = protoResp.PlannedPrivate
+	resp.PlannedPrivate = protoResp.PlannedPrivate
 
-	response.LegacyTypeSystem = protoResp.UnsafeToUseLegacyTypeSystem
+	resp.LegacyTypeSystem = protoResp.UnsafeToUseLegacyTypeSystem
 
-	response.Deferred = convert.ProtoToDeferred(protoResp.Deferred)
+	resp.Deferred = convert.ProtoToDeferred(protoResp.Deferred)
 
-	return &response, diags
+	if protoResp.PlannedIdentity != nil && protoResp.PlannedIdentity.IdentityData != nil {
+		if resSchema.Identity == nil {
+			diags = append(diags, typ.ErrorDiagnostics("unknown identity type", fmt.Errorf("unknown identity type %s", request.TypeName))...)
+			return nil, diags
+		}
+
+		resp.PlannedIdentity, err = decodeDynamicValue(protoResp.PlannedIdentity.IdentityData, configschema.SchemaNestedAttributeTypeImpliedType(resSchema.Identity))
+		if err != nil {
+			diags = append(diags, typ.ErrorDiagnostics("decode dynamic value for identity data", err)...)
+		}
+	}
+
+	return &resp, diags
 }
 
 func (c *Client) ApplyResourceChange(ctx context.Context, request typ.ApplyResourceChangeRequest) (*typ.ApplyResourceChangeResponse, typ.Diagnostics) {
 	var diags typ.Diagnostics
 	schema := c.schemas
+
+	resSchema, ok := schema.ResourceTypes[request.TypeName]
+	if !ok {
+		diags = append(diags, typ.ErrorDiagnostics("no schema", fmt.Errorf("unknown resource type %q", request.TypeName))...)
+		return nil, diags
+	}
 
 	resTyp, ok := schema.ResourceTypesCty[request.TypeName]
 	if !ok {
@@ -553,6 +630,21 @@ func (c *Client) ApplyResourceChange(ctx context.Context, request typ.ApplyResou
 		protoReq.ProviderMeta = &tfprotov5.DynamicValue{MsgPack: metaMP}
 	}
 
+	if !request.PlannedIdentity.IsNull() {
+		if resSchema.Identity == nil {
+			diags = append(diags, typ.ErrorDiagnostics("identity type not found", fmt.Errorf("identity type not found for resoruce type %s", request.TypeName))...)
+			return nil, diags
+		}
+		currentIdentityMP, err := msgpack.Marshal(request.PlannedIdentity, configschema.SchemaNestedAttributeTypeImpliedType(resSchema.Identity))
+		if err != nil {
+			diags = append(diags, typ.ErrorDiagnostics("msgpach marshal", err)...)
+			return nil, diags
+		}
+		protoReq.PlannedIdentity = &tfprotov5.ResourceIdentityData{
+			IdentityData: &tfprotov5.DynamicValue{MsgPack: currentIdentityMP},
+		}
+	}
+
 	protoResp, err := c.client.ApplyResourceChange(ctx, protoReq)
 	if err != nil {
 		diags = append(diags, typ.RPCErrorDiagnostics(err)...)
@@ -570,24 +662,62 @@ func (c *Client) ApplyResourceChange(ctx context.Context, request typ.ApplyResou
 		return nil, diags
 	}
 
-	return &typ.ApplyResourceChangeResponse{
+	resp := &typ.ApplyResourceChangeResponse{
 		NewState:         state,
 		Private:          protoResp.Private,
 		LegacyTypeSystem: protoResp.UnsafeToUseLegacyTypeSystem,
-	}, diags
+	}
+
+	if protoResp.NewIdentity != nil && protoResp.NewIdentity.IdentityData != nil {
+		if resSchema.Identity == nil {
+			diags = append(diags, typ.ErrorDiagnostics("unknown identity type", fmt.Errorf("unknown identity type %s", request.TypeName))...)
+			return nil, diags
+		}
+
+		resp.NewIdentity, err = decodeDynamicValue(protoResp.NewIdentity.IdentityData, configschema.SchemaNestedAttributeTypeImpliedType(resSchema.Identity))
+		if err != nil {
+			diags = append(diags, typ.ErrorDiagnostics("decode dynamic value for identity data", err)...)
+		}
+	}
+
+	return resp, diags
 }
 
 func (c *Client) ImportResourceState(ctx context.Context, request typ.ImportResourceStateRequest) (*typ.ImportResourceStateResponse, typ.Diagnostics) {
 	var diags typ.Diagnostics
 
 	schema := c.schemas
-	resp, err := c.client.ImportResourceState(ctx, &tfprotov5.ImportResourceStateRequest{
+
+	protoReq := &tfprotov5.ImportResourceStateRequest{
 		TypeName: request.TypeName,
 		ID:       request.ID,
 		ClientCapabilities: &tfprotov5.ImportResourceStateClientCapabilities{
 			DeferralAllowed: request.ClientCapabilities.DeferralAllowed,
 		},
-	})
+	}
+
+	if !request.Identity.IsNull() {
+		resSchema, ok := schema.ResourceTypes[request.TypeName]
+		if !ok {
+			diags = append(diags, typ.ErrorDiagnostics("no schema", fmt.Errorf("unknown resource type %q", request.TypeName))...)
+			return nil, diags
+		}
+
+		if resSchema.Identity == nil {
+			diags = append(diags, typ.ErrorDiagnostics("identity type not found", fmt.Errorf("identity type not found for resoruce type %s", request.TypeName))...)
+			return nil, diags
+		}
+		mp, err := msgpack.Marshal(request.Identity, configschema.SchemaNestedAttributeTypeImpliedType(resSchema.Identity))
+		if err != nil {
+			diags = append(diags, typ.ErrorDiagnostics("msgpach marshal", err)...)
+			return nil, diags
+		}
+		protoReq.Identity = &tfprotov5.ResourceIdentityData{
+			IdentityData: &tfprotov5.DynamicValue{MsgPack: mp},
+		}
+	}
+
+	resp, err := c.client.ImportResourceState(ctx, protoReq)
 	if err != nil {
 		return nil, typ.RPCErrorDiagnostics(err)
 	}
@@ -618,6 +748,26 @@ func (c *Client) ImportResourceState(ctx context.Context, request typ.ImportReso
 			return nil, diags
 		}
 		resource.State = state
+
+		if imported.Identity != nil && imported.Identity.IdentityData != nil {
+			importedIdentitySchema, ok := schema.ResourceTypes[imported.TypeName]
+			if !ok {
+				diags = append(diags, typ.ErrorDiagnostics("no schema", fmt.Errorf("unknown imported resource type %q", imported.TypeName))...)
+				continue
+			}
+
+			if importedIdentitySchema.Identity == nil {
+				diags = append(diags, typ.ErrorDiagnostics("unknown identity type", fmt.Errorf("unknown identity type %s", imported.TypeName))...)
+				continue
+			}
+
+			resource.Identity, err = decodeDynamicValue(imported.Identity.IdentityData, configschema.SchemaNestedAttributeTypeImpliedType(importedIdentitySchema.Identity))
+			if err != nil {
+				diags = append(diags, typ.ErrorDiagnostics("decode dynamic value for identity data", err)...)
+				return &response, diags
+			}
+		}
+
 		response.ImportedResources = append(response.ImportedResources, resource)
 	}
 
@@ -626,6 +776,7 @@ func (c *Client) ImportResourceState(ctx context.Context, request typ.ImportReso
 
 func (c *Client) MoveResourceState(ctx context.Context, request typ.MoveResourceStateRequest) (*typ.MoveResourceStateResponse, typ.Diagnostics) {
 	var diags typ.Diagnostics
+	schema := c.schemas
 
 	protoReq := &tfprotov5.MoveResourceStateRequest{
 		SourceProviderAddress: request.SourceProviderAddress,
@@ -638,12 +789,15 @@ func (c *Client) MoveResourceState(ctx context.Context, request typ.MoveResource
 		TargetTypeName: request.TargetTypeName,
 	}
 
+	if len(request.SourceIdentity) > 0 {
+		protoReq.SourceIdentity = &tfprotov5.RawState{JSON: request.SourceIdentity}
+	}
+
 	protoResp, err := c.client.MoveResourceState(ctx, protoReq)
 	if err != nil {
 		return nil, typ.RPCErrorDiagnostics(err)
 	}
 
-	schema := c.schemas
 	targetType, ok := schema.ResourceTypesCty[request.TargetTypeName]
 	if !ok {
 		diags = append(diags, typ.ErrorDiagnostics("no schema", fmt.Errorf("unknown resource type %q", request.TargetTypeName))...)
@@ -656,10 +810,26 @@ func (c *Client) MoveResourceState(ctx context.Context, request typ.MoveResource
 		return nil, diags
 	}
 
-	return &typ.MoveResourceStateResponse{
+	resp := &typ.MoveResourceStateResponse{
 		TargetState:   state,
 		TargetPrivate: protoResp.TargetPrivate,
-	}, nil
+	}
+
+	if protoResp.TargetIdentity != nil && protoResp.TargetIdentity.IdentityData != nil {
+		targetResSchema := schema.ResourceTypes[request.TargetTypeName]
+
+		if targetResSchema.Identity == nil {
+			diags = append(diags, typ.ErrorDiagnostics("unknown identity type", fmt.Errorf("unknown identity type %s", request.TargetTypeName))...)
+			return nil, diags
+		}
+
+		resp.TargetIdentity, err = decodeDynamicValue(protoResp.TargetIdentity.IdentityData, configschema.SchemaNestedAttributeTypeImpliedType(targetResSchema.Identity))
+		if err != nil {
+			diags = append(diags, typ.ErrorDiagnostics("decode dynamic value for identity data", err)...)
+		}
+	}
+
+	return resp, diags
 }
 
 func (c *Client) ReadDataSource(ctx context.Context, request typ.ReadDataSourceRequest) (*typ.ReadDataSourceResponse, typ.Diagnostics) {
@@ -779,7 +949,7 @@ func (c *Client) CallFunction(ctx context.Context, request typ.CallFunctionReque
 			resp.Err = function.NewArgError(int(*protoResp.Error.FunctionArgument), resp.Err)
 		}
 
-		return resp, nil
+		return resp, diags
 	}
 
 	resultVal, err := decodeDynamicValue(protoResp.Result, funcDecl.ReturnType)
@@ -788,41 +958,231 @@ func (c *Client) CallFunction(ctx context.Context, request typ.CallFunctionReque
 		return nil, diags
 	}
 	resp.Result = resultVal
-	return resp, nil
+	return resp, diags
 }
 
-// GetResourceIdentitySchemas implements tfclient.Client.
-func (c *Client) GetResourceIdentitySchemas() *typ.GetResourceIdentitySchemasResponse {
-	panic("unimplemented")
+func (c *Client) GetResourceIdentitySchemas(ctx context.Context) (*typ.GetResourceIdentitySchemasResponse, typ.Diagnostics) {
+	var diags typ.Diagnostics
+	resp := typ.GetResourceIdentitySchemasResponse{
+		IdentityTypes: map[string]typ.IdentitySchema{},
+	}
+
+	protoResp, err := c.client.GetResourceIdentitySchemas(ctx, &tfprotov5.GetResourceIdentitySchemasRequest{})
+	if err != nil {
+		if status.Code(err) == codes.Unimplemented {
+			return &resp, nil
+		}
+
+		diags = append(diags, typ.RPCErrorDiagnostics(err)...)
+		return nil, diags
+	}
+
+	respDiags := convert.DecodeDiagnostics(protoResp.Diagnostics)
+	diags = append(diags, respDiags...)
+	if diags.HasErrors() {
+		return nil, diags
+	}
+
+	for name, res := range protoResp.IdentitySchemas {
+		resp.IdentityTypes[name] = typ.IdentitySchema{
+			Version: res.Version,
+			Body:    convert.ProtoToIdentitySchema(res.IdentityAttributes),
+		}
+	}
+
+	return &resp, diags
 }
 
-// ValidateListResourceConfig implements tfclient.Client.
-func (c *Client) ValidateListResourceConfig(context.Context, typ.ValidateListResourceConfigRequest) typ.Diagnostics {
-	panic("unimplemented")
+func (c *Client) UpgradeResourceIdentity(ctx context.Context, request typ.UpgradeResourceIdentityRequest) (*typ.UpgradeResourceIdentityResponse, typ.Diagnostics) {
+	var diags typ.Diagnostics
+
+	schema, _ := c.GetProviderSchema()
+	resSchema, ok := schema.ResourceTypes[request.TypeName]
+	if !ok {
+		diags = append(diags, typ.ErrorDiagnostics("no schema", fmt.Errorf("unknown resource type %q", request.TypeName))...)
+		return nil, diags
+	}
+
+	protoReq := &tfprotov5.UpgradeResourceIdentityRequest{
+		TypeName: request.TypeName,
+		Version:  request.Version,
+		RawIdentity: &tfprotov5.RawState{
+			JSON: request.RawIdentityJSON,
+		},
+	}
+
+	protoResp, err := c.client.UpgradeResourceIdentity(ctx, protoReq)
+	if err != nil {
+		diags = append(diags, typ.RPCErrorDiagnostics(err)...)
+		return nil, diags
+	}
+	respDiags := convert.DecodeDiagnostics(protoResp.Diagnostics)
+	diags = append(diags, respDiags...)
+	if diags.HasErrors() {
+		return nil, diags
+	}
+
+	ty := configschema.SchemaNestedAttributeTypeImpliedType(resSchema.Identity)
+
+	resp := &typ.UpgradeResourceIdentityResponse{
+		UpgradedIdentity: cty.NullVal(ty),
+	}
+	if protoResp.UpgradedIdentity == nil {
+		return resp, diags
+	}
+
+	identity, err := decodeDynamicValue(protoResp.UpgradedIdentity.IdentityData, ty)
+	if err != nil {
+		diags = append(diags, typ.ErrorDiagnostics("decode dynamic value for identity data", err)...)
+		return nil, diags
+	}
+
+	resp.UpgradedIdentity = identity
+	return resp, diags
 }
 
-// UpgradeResourceIdentity implements tfclient.Client.
-func (c *Client) UpgradeResourceIdentity(context.Context, typ.UpgradeResourceIdentityRequest) (*typ.UpgradeResourceIdentityResponse, typ.Diagnostics) {
-	panic("unimplemented")
+func (c *Client) ValidateEphemeralResourceConfig(ctx context.Context, request typ.ValidateEphemeralResourceConfigRequest) typ.Diagnostics {
+	var diags typ.Diagnostics
+
+	schema := c.schemas
+
+	ephemSchema, ok := schema.EphemeralResourceTypesCty[request.TypeName]
+	if !ok {
+		diags = append(diags, typ.ErrorDiagnostics("no schema", fmt.Errorf("unknown resource type %q", request.TypeName))...)
+		return diags
+	}
+
+	mp, err := msgpack.Marshal(request.Config, ephemSchema)
+	if err != nil {
+		diags = append(diags, typ.ErrorDiagnostics("msgpack marshal", err)...)
+		return diags
+	}
+
+	protoReq := &tfprotov5.ValidateEphemeralResourceConfigRequest{
+		TypeName: request.TypeName,
+		Config:   &tfprotov5.DynamicValue{MsgPack: mp},
+	}
+
+	protoResp, err := c.client.ValidateEphemeralResourceConfig(ctx, protoReq)
+	if err != nil {
+		diags = append(diags, typ.RPCErrorDiagnostics(err)...)
+		return diags
+	}
+
+	respDiags := convert.DecodeDiagnostics(protoResp.Diagnostics)
+	diags = append(diags, respDiags...)
+	if diags.HasErrors() {
+		return diags
+	}
+
+	return diags
 }
 
-// ValidateEphemeralResourceConfig implements tfclient.Client.
-func (c *Client) ValidateEphemeralResourceConfig(context.Context, typ.ValidateEphemeralResourceConfigRequest) typ.Diagnostics {
-	panic("unimplemented")
+func (c *Client) OpenEphemeralResource(ctx context.Context, request typ.OpenEphemeralResourceRequest) (*typ.OpenEphemeralResourceResponse, typ.Diagnostics) {
+	var diags typ.Diagnostics
+
+	schema := c.schemas
+
+	ephemSchema, ok := schema.EphemeralResourceTypesCty[request.TypeName]
+	if !ok {
+		diags = append(diags, typ.ErrorDiagnostics("no schema", fmt.Errorf("unknown resource type %q", request.TypeName))...)
+		return nil, diags
+	}
+
+	mp, err := msgpack.Marshal(request.Config, ephemSchema)
+	if err != nil {
+		diags = append(diags, typ.ErrorDiagnostics("msgpack marshal", err)...)
+		return nil, diags
+	}
+
+	protoReq := &tfprotov5.OpenEphemeralResourceRequest{
+		TypeName: request.TypeName,
+		Config:   &tfprotov5.DynamicValue{MsgPack: mp},
+		ClientCapabilities: &tfprotov5.OpenEphemeralResourceClientCapabilities{
+			DeferralAllowed: request.ClientCapabilities.DeferralAllowed,
+		},
+	}
+
+	protoResp, err := c.client.OpenEphemeralResource(ctx, protoReq)
+	if err != nil {
+		diags = append(diags, typ.RPCErrorDiagnostics(err)...)
+		return nil, diags
+	}
+
+	respDiags := convert.DecodeDiagnostics(protoResp.Diagnostics)
+	diags = append(diags, respDiags...)
+	if diags.HasErrors() {
+		return nil, diags
+	}
+
+	state, err := decodeDynamicValue(protoResp.Result, ephemSchema)
+	if err != nil {
+		diags = append(diags, typ.ErrorDiagnostics("decode dynamic value for result", err)...)
+	}
+
+	resp := &typ.OpenEphemeralResourceResponse{
+		Result:   state,
+		Private:  protoResp.Private,
+		Deferred: convert.ProtoToDeferred(protoResp.Deferred),
+		RenewAt:  protoResp.RenewAt,
+	}
+
+	return resp, diags
 }
 
-// OpenEphemeralResource implements tfclient.Client.
-func (c *Client) OpenEphemeralResource(context.Context, typ.OpenEphemeralResourceRequest) (*typ.OpenEphemeralResourceResponse, typ.Diagnostics) {
-	panic("unimplemented")
+func (c *Client) RenewEphemeralResource(ctx context.Context, request typ.RenewEphemeralResourceRequest) (*typ.RenewEphemeralResourceResponse, typ.Diagnostics) {
+	var diags typ.Diagnostics
+
+	protoReq := &tfprotov5.RenewEphemeralResourceRequest{
+		TypeName: request.TypeName,
+		Private:  request.Private,
+	}
+
+	protoResp, err := c.client.RenewEphemeralResource(ctx, protoReq)
+	if err != nil {
+		diags = append(diags, typ.RPCErrorDiagnostics(err)...)
+		return nil, diags
+	}
+
+	respDiags := convert.DecodeDiagnostics(protoResp.Diagnostics)
+	diags = append(diags, respDiags...)
+	if diags.HasErrors() {
+		return nil, diags
+	}
+
+	resp := &typ.RenewEphemeralResourceResponse{
+		Private: protoResp.Private,
+		RenewAt: protoResp.RenewAt,
+	}
+
+	return resp, diags
 }
 
-// CloseEphemeralResource implements tfclient.Client.
-func (c *Client) CloseEphemeralResource(context.Context, typ.CloseEphemeralResourceRequest) typ.Diagnostics {
-	panic("unimplemented")
+func (c *Client) CloseEphemeralResource(ctx context.Context, request typ.CloseEphemeralResourceRequest) typ.Diagnostics {
+	var diags typ.Diagnostics
+
+	protoReq := &tfprotov5.CloseEphemeralResourceRequest{
+		TypeName: request.TypeName,
+		Private:  request.Private,
+	}
+
+	protoResp, err := c.client.CloseEphemeralResource(ctx, protoReq)
+	if err != nil {
+		diags = append(diags, typ.RPCErrorDiagnostics(err)...)
+		return diags
+	}
+
+	respDiags := convert.DecodeDiagnostics(protoResp.Diagnostics)
+	diags = append(diags, respDiags...)
+	if diags.HasErrors() {
+		return diags
+	}
+
+	return diags
 }
 
-// RenewEphemeralResource implements tfclient.Client.
-func (c *Client) RenewEphemeralResource(context.Context, typ.RenewEphemeralResourceRequest) (*typ.RenewEphemeralResourceResponse, typ.Diagnostics) {
+func (c *Client) ValidateListResourceConfig(ctx context.Context, req typ.ValidateListResourceConfigRequest) typ.Diagnostics {
+	// TODO: terraform-plugin-go doesn't support ValidateListResourceConfig yet.
 	panic("unimplemented")
 }
 

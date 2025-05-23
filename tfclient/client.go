@@ -22,7 +22,7 @@ type Client interface {
 	// GetResourceIdentitySchemas returns the identity schemas for all managed resources
 	// for the provider. Usually you don't need to call this method directly as GetProviderSchema
 	// will merge the identity schemas into the provider schema.
-	GetResourceIdentitySchemas() *typ.GetResourceIdentitySchemasResponse
+	GetResourceIdentitySchemas(context.Context) (*typ.GetResourceIdentitySchemasResponse, typ.Diagnostics)
 
 	// ValidateProviderConfig allows the provider to validate the configuration.
 	// The ValidateProviderConfigResponse.PreparedConfig field is unused. The

@@ -10,6 +10,7 @@ import (
 	tfjson "github.com/hashicorp/terraform-json"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
+	"github.com/magodo/terraform-client-go/tfclient/typ"
 	"github.com/zclconf/go-cty/cty"
 )
 
@@ -96,12 +97,16 @@ func protoSchemaNestedBlock(name string, b *tfjson.SchemaBlockType) *tfprotov6.S
 	}
 }
 
-func ProtoToProviderSchema(s *tfprotov6.Schema) tfjson.Schema {
-	// TODO: Adding identity once https://github.com/hashicorp/terraform-json/issues/164 got resolved.
-	return tfjson.Schema{
+func ProtoToProviderSchema(s *tfprotov6.Schema, id *tfprotov6.ResourceIdentitySchema) tfjson.Schema {
+	schema := tfjson.Schema{
 		Version: uint64(s.Version),
 		Block:   ProtoToConfigSchema(s.Block),
 	}
+	if id != nil {
+		schema.IdentityVersion = id.Version
+		schema.Identity = ProtoToIdentitySchema(id.IdentityAttributes)
+	}
+	return schema
 }
 
 func ProtoToConfigSchema(b *tfprotov6.SchemaBlock) *tfjson.SchemaBlock {
@@ -310,5 +315,60 @@ func tfjsonObjectToProto(b *tfjson.SchemaNestedAttributeType) *tfprotov6.SchemaO
 	return &tfprotov6.SchemaObject{
 		Attributes: attributes,
 		Nesting:    nesting,
+	}
+}
+
+func ProtoToIdentitySchema(attributes []*tfprotov6.ResourceIdentitySchemaAttribute) *tfjson.SchemaNestedAttributeType {
+	obj := &tfjson.SchemaNestedAttributeType{
+		Attributes:  make(map[string]*tfjson.SchemaAttribute),
+		NestingMode: tfjson.SchemaNestingModeSingle,
+	}
+
+	for _, a := range attributes {
+		attr := &tfjson.SchemaAttribute{
+			Description: a.Description,
+			Required:    a.RequiredForImport,
+			Optional:    a.OptionalForImport,
+		}
+
+		typ, _ := a.Type.MarshalJSON()
+		if err := json.Unmarshal(typ, &attr.AttributeType); err != nil {
+			panic(err)
+		}
+
+		obj.Attributes[a.Name] = attr
+	}
+
+	return obj
+}
+
+func ResourceIdentitySchemaToProto(b typ.IdentitySchema) *tfprotov6.ResourceIdentitySchema {
+	attrs := []*tfprotov6.ResourceIdentitySchemaAttribute{}
+	for _, name := range sortedKeys(b.Body.Attributes) {
+		a := b.Body.Attributes[name]
+
+		attr := &tfprotov6.ResourceIdentitySchemaAttribute{
+			Name:              name,
+			Description:       a.Description,
+			RequiredForImport: a.Required,
+			OptionalForImport: a.Optional,
+		}
+
+		ty, err := a.AttributeType.MarshalJSON()
+		if err != nil {
+			panic(err)
+		}
+
+		attr.Type, err = tftypes.ParseJSONType(ty)
+		if err != nil {
+			panic(err)
+		}
+
+		attrs = append(attrs, attr)
+	}
+
+	return &tfprotov6.ResourceIdentitySchema{
+		Version:            b.Version,
+		IdentityAttributes: attrs,
 	}
 }

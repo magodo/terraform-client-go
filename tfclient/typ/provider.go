@@ -521,7 +521,7 @@ type GetResourceIdentitySchemasResponse struct {
 type IdentitySchema struct {
 	Version int64
 
-	Body *tfjson.SchemaBlockType
+	Body *tfjson.SchemaNestedAttributeType
 }
 
 type ValidateEphemeralResourceConfigRequest struct {

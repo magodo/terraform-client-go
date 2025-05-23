@@ -25,7 +25,7 @@ provider "restful" {
 }
 
 locals {
-  terraform-plugin-go-commit = "v0.23.0"
+  terraform-plugin-go-commit = "v0.28.0"
   terraform-plugin-go = toset([
     "tfprotov5/internal/tfplugin5/tfplugin5.proto",
     "tfprotov6/internal/tfplugin6/tfplugin6.proto",
@@ -88,7 +88,7 @@ locals {
     "tfprotov6/internal/toproto/timestamp.go",
     "tfprotov6/internal/toproto/resource_identity_data.go",
   ])
-  terraform-commit = "v1.10.0-alpha20240730"
+  terraform-commit = "v1.13.0-alpha20250521"
   terraform = toset([
     "internal/providers/provider.go",
     "internal/providers/functions.go",
