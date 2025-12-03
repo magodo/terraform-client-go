@@ -11,13 +11,13 @@ require (
 	github.com/google/go-cmp v0.7.0
 	github.com/hashicorp/go-hclog v1.6.3
 	github.com/hashicorp/go-plugin v1.7.0
-	github.com/hashicorp/go-version v1.7.0
+	github.com/hashicorp/go-version v1.8.0
 	github.com/hashicorp/hc-install v0.9.0
 	github.com/hashicorp/hcl/v2 v2.11.1
 	github.com/hashicorp/terraform-exec v0.21.0
 	github.com/hashicorp/terraform-json v0.25.0
 	github.com/hashicorp/terraform-plugin-go v0.29.0
-	github.com/zclconf/go-cty v1.16.3
+	github.com/zclconf/go-cty v1.16.4
 	github.com/zclconf/go-cty-debug v0.0.0-20240209213017-b8d9e32151be
 	google.golang.org/grpc v1.75.1
 	google.golang.org/protobuf v1.36.9
@@ -47,4 +47,4 @@ require (
 )
 
 // Remove this once https://github.com/hashicorp/terraform-json/issues/164 is resolved.
-replace github.com/hashicorp/terraform-json => github.com/magodo/terraform-json v0.13.1-0.20250523033318-1c9170c5e727
+replace github.com/hashicorp/terraform-json => github.com/magodo/terraform-json v0.13.1-0.20251203000701-180d3ccf4a28
