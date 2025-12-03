@@ -2,6 +2,7 @@ package tf5client
 
 import (
 	"context"
+	"io"
 
 	"github.com/magodo/terraform-client-go/tfclient/tfprotov5/internal/fromproto"
 	"github.com/magodo/terraform-client-go/tfclient/tfprotov5/internal/tfplugin5"
@@ -15,6 +16,8 @@ type GRPCClient struct {
 }
 
 var _ tfprotov5.ProviderServer = &GRPCClient{}
+var _ tfprotov5.ActionServer = &GRPCClient{}
+var _ tfprotov5.ListResourceServer = &GRPCClient{}
 
 // ApplyResourceChange implements tfprotov5.ProviderServer
 func (c *GRPCClient) ApplyResourceChange(ctx context.Context, req *tfprotov5.ApplyResourceChangeRequest) (*tfprotov5.ApplyResourceChangeResponse, error) {
@@ -306,4 +309,103 @@ func (c *GRPCClient) CloseEphemeralResource(ctx context.Context, req *tfprotov5.
 		return nil, err
 	}
 	return ret, nil
+}
+
+func (c *GRPCClient) ValidateListResourceConfig(ctx context.Context, req *tfprotov5.ValidateListResourceConfigRequest) (*tfprotov5.ValidateListResourceConfigResponse, error) {
+	r := toproto.ValidateListResourceConfigRequest(req)
+	resp, err := c.client.ValidateListResourceConfig(ctx, r)
+	if err != nil {
+		return nil, err
+	}
+	return fromproto.ValidateListResourceConfig_Response(resp)
+}
+
+func (c *GRPCClient) ListResource(ctx context.Context, req *tfprotov5.ListResourceRequest) (*tfprotov5.ListResourceServerStream, error) {
+	r := toproto.ListResourceRequest(req)
+	resp, err := c.client.ListResource(ctx, r)
+	if err != nil {
+		return nil, err
+	}
+
+	var result tfprotov5.ListResourceServerStream
+	result.Results = func(yield func(tfprotov5.ListResourceResult) bool) {
+		for {
+			event, err := resp.Recv()
+			if err != nil {
+				break
+			}
+			evt, err := fromproto.ListResource_ListResourceEvent(event)
+			if err != nil {
+				// TODO: need a better error handling
+				continue
+			}
+			if !yield(*evt) {
+				break
+			}
+		}
+	}
+	return &result, nil
+}
+
+func (c *GRPCClient) ValidateActionConfig(ctx context.Context, req *tfprotov5.ValidateActionConfigRequest) (*tfprotov5.ValidateActionConfigResponse, error) {
+	r := toproto.ValidateActionConfigRequest(req)
+	resp, err := c.client.ValidateActionConfig(ctx, r)
+	if err != nil {
+		return nil, err
+	}
+	return fromproto.ValidateActionConfig_Response(resp)
+}
+
+func (c *GRPCClient) PlanAction(ctx context.Context, req *tfprotov5.PlanActionRequest) (*tfprotov5.PlanActionResponse, error) {
+	r := toproto.PlanActionRequest(req)
+	resp, err := c.client.PlanAction(ctx, r)
+	if err != nil {
+		return nil, err
+	}
+	return fromproto.PlanAction_Response(resp)
+}
+
+func (c *GRPCClient) InvokeAction(ctx context.Context, req *tfprotov5.InvokeActionRequest) (*tfprotov5.InvokeActionServerStream, error) {
+	r := toproto.InvokeActionRequest(req)
+	resp, err := c.client.InvokeAction(ctx, r)
+	if err != nil {
+		return nil, err
+	}
+	var result tfprotov5.InvokeActionServerStream
+	result.Events = func(yield func(tfprotov5.InvokeActionEvent) bool) {
+		for {
+			event, err := resp.Recv()
+
+			var evt *tfprotov5.InvokeActionEvent
+			// This follows the same logic as terraform/internal/plugin/grpc_provider.go does.
+			if err == io.EOF {
+				break
+			}
+			if err != nil {
+				// We handle this by returning a finished response with the error
+				// If the client errors we won't be receiving any more events.
+				evt = &tfprotov5.InvokeActionEvent{
+					Type: tfprotov5.CompletedInvokeActionEventType{
+						Diagnostics: []*tfprotov5.Diagnostic{
+							&tfprotov5.Diagnostic{
+								Severity: tfprotov5.DiagnosticSeverityError,
+								Summary:  "rpc error",
+								Detail:   err.Error(),
+							},
+						},
+					},
+				}
+			} else {
+				evt, err = fromproto.InvokeAction_InvokeActionEvent(event)
+				if err != nil {
+					// TODO: need a better error handling
+					continue
+				}
+			}
+			if !yield(*evt) {
+				break
+			}
+		}
+	}
+	return &result, nil
 }
