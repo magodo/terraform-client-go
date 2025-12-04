@@ -20,7 +20,6 @@ import (
 type FlagSet struct {
 	PluginPath   string
 	LogLevel     string
-	ProviderCfg  string
 	TimeoutSec   int
 	FunctionName string
 	FunctionArgs stringSlice
@@ -41,7 +40,6 @@ func main() {
 	var fset FlagSet
 	flag.StringVar(&fset.PluginPath, "path", "", "The path to the plugin")
 	flag.StringVar(&fset.LogLevel, "log-level", hclog.Error.String(), "Log level")
-	flag.StringVar(&fset.ProviderCfg, "cfg", "{}", "The content of provider config block in JSON")
 	flag.IntVar(&fset.TimeoutSec, "timeout", 0, "Timeout in second. Defaults to no timeout.")
 	flag.StringVar(&fset.FunctionName, "func", "", "The name of the function")
 	flag.Var(&fset.FunctionArgs, "arg", "The argument of the function (can be specified multiple times)")
