@@ -89,6 +89,24 @@ func GetProviderSchemaResponse(in *tfplugin5.GetProviderSchema_Response) (*tfpro
 		ephemeralResourceSchemas[k] = schema
 	}
 
+	listResourceSchemas := make(map[string]*tfprotov5.Schema, len(in.ListResourceSchemas))
+	for k, v := range in.ListResourceSchemas {
+		schema, err := Schema(v)
+		if err != nil {
+			return nil, err
+		}
+		listResourceSchemas[k] = schema
+	}
+
+	actionSchemas := make(map[string]*tfprotov5.ActionSchema, len(in.ActionSchemas))
+	for k, v := range in.ActionSchemas {
+		schema, err := ActionSchema(v)
+		if err != nil {
+			return nil, err
+		}
+		actionSchemas[k] = schema
+	}
+
 	funcs, err := Functions(in.Functions)
 	if err != nil {
 		return nil, err
@@ -107,6 +125,8 @@ func GetProviderSchemaResponse(in *tfplugin5.GetProviderSchema_Response) (*tfpro
 		DataSourceSchemas:        dataSourceSchemas,
 		Functions:                funcs,
 		EphemeralResourceSchemas: ephemeralResourceSchemas,
+		ListResourceSchemas:      listResourceSchemas,
+		ActionSchemas:            actionSchemas,
 		Diagnostics:              diags,
 	}
 

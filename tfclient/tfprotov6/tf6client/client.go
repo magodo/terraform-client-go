@@ -79,9 +79,8 @@ func New(pluginClient *plugin.Client, grpcClient TFProtoV6Client, schema *typ.Ge
 		EphemeralResourceTypesCty: map[string]cty.Type{},
 		ListResourceTypes:         map[string]tfjson.Schema{},
 		ListResourceTypesCty:      map[string]cty.Type{},
-		ServerCapabilities: typ.ServerCapabilities{
-			PlanDestroy: false,
-		},
+		Actions:                   map[string]tfjson.Schema{},
+		ActionsCty:                map[string]cty.Type{},
 	}
 
 	identResp, err := grpcClient.GetResourceIdentitySchemas(ctx, new(tfprotov6.GetResourceIdentitySchemasRequest))
@@ -1263,9 +1262,8 @@ func (c *Client) ListResource(ctx context.Context, req typ.ListResourceRequest) 
 		return
 	}
 
-	configSchema := listSchema.Block.NestedBlocks["config"]
 	config := req.Config.GetAttr("config")
-	mp, err := msgpack.Marshal(config, configschema.SchemaBlockImpliedType(configSchema.Block))
+	mp, err := msgpack.Marshal(config, configschema.SchemaBlockImpliedType(listSchema.Block))
 	if err != nil {
 		diags = append(diags, typ.ErrorDiagnostics("msgpack marshal", err)...)
 	}
