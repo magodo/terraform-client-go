@@ -46,6 +46,9 @@ type Client interface {
 	// resource configuration values.
 	ValidateListResourceConfig(context.Context, typ.ValidateListResourceConfigRequest) typ.Diagnostics
 
+	// ValidateActionConfig allows the provider to validate the action configuration values.
+	ValidateActionConfig(context.Context, typ.ValidateActionConfigRequest) typ.Diagnostics
+
 	// UpgradeResourceState is called when the state loader encounters an
 	// instance state whose schema version is less than the one reported by the
 	// currently-used version of the corresponding provider, and the upgraded
@@ -106,6 +109,15 @@ type Client interface {
 
 	// CallFunction calls a provider-contributed function.
 	CallFunction(context.Context, typ.CallFunctionRequest) (*typ.CallFunctionResponse, typ.Diagnostics)
+
+	// ListResource lists resources
+	ListResource(context.Context, typ.ListResourceRequest) (typ.ListResourceResponse, typ.Diagnostics)
+
+	// PlanAction takes the proposed action config and returns the plan
+	PlanAction(context.Context, typ.PlanActionRequest) (typ.Diagnostics, typ.PlanActionResponse)
+
+	// InvokeAction invokes an action
+	InvokeAction(context.Context, typ.InvokeActionRequest) (typ.Diagnostics, typ.InvokeActionResponse)
 
 	// Close shuts down the plugin process if applicable.
 	Close()

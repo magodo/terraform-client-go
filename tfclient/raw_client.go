@@ -2,25 +2,25 @@ package tfclient
 
 import (
 	"github.com/hashicorp/go-plugin"
-	"github.com/hashicorp/terraform-plugin-go/tfprotov5"
-	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
+	"github.com/magodo/terraform-client-go/tfclient/tfprotov5/tf5client"
+	"github.com/magodo/terraform-client-go/tfclient/tfprotov6/tf6client"
 )
 
 type RawClient struct {
 	pluginClient *plugin.Client
 
 	// Either one of below will be non nil
-	v5client tfprotov5.ProviderServer
-	v6client tfprotov6.ProviderServer
+	v5client tf5client.TFProtoV5Client
+	v6client tf6client.TFProtoV6Client
 }
 
 // AsV5Client returns the v5 client if the linked provider is running in protocol v5, otherwise return nil
-func (c *RawClient) AsV5Client() tfprotov5.ProviderServer {
+func (c *RawClient) AsV5Client() tf5client.TFProtoV5Client {
 	return c.v5client
 }
 
 // AsV6Client returns the v6 client if the linked provider is running in protocol v6, otherwise return nil
-func (c *RawClient) AsV6Client() tfprotov6.ProviderServer {
+func (c *RawClient) AsV6Client() tf6client.TFProtoV6Client {
 	return c.v6client
 }
 
