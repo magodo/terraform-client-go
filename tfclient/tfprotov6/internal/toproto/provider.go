@@ -53,14 +53,9 @@ func ConfigureProvider_Request(in *tfprotov6.ConfigureProviderRequest) *tfplugin
 	}
 
 	req := &tfplugin6.ConfigureProvider_Request{
-		TerraformVersion: in.TerraformVersion,
-		Config:           DynamicValue(in.Config),
-	}
-
-	if in.ClientCapabilities != nil {
-		req.ClientCapabilities = &tfplugin6.ClientCapabilities{
-			DeferralAllowed: in.ClientCapabilities.DeferralAllowed,
-		}
+		TerraformVersion:   in.TerraformVersion,
+		Config:             DynamicValue(in.Config),
+		ClientCapabilities: ConfigureProviderClientCapabilities(in.ClientCapabilities),
 	}
 
 	return req

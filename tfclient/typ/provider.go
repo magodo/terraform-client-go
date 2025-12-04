@@ -3,6 +3,7 @@
 package typ
 
 import (
+	"iter"
 	"time"
 
 	tfjson "github.com/hashicorp/terraform-json"
@@ -42,13 +43,17 @@ type GetProviderSchemaResponse struct {
 	// to the cty type of its schema.
 	EphemeralResourceTypesCty map[string]cty.Type
 
-	// ListResourceTypes maps the name of an ephemeral resource type to its
-	// schema.
+	// ListResourceTypes maps the name of a list resource type to its schema.
 	ListResourceTypes map[string]tfjson.Schema
 
-	// ListResourceTypes maps the name of an ephemeral resource type to the
-	// cty type of its schema.
+	// ListResourceTypes maps the name of a list resource type to the cty type of its schema.
 	ListResourceTypesCty map[string]cty.Type
+
+	// Actions maps the name of an action type to its schema.
+	Actions map[string]tfjson.Schema
+
+	// Actions maps the name of an action type to the cty type of its schema.
+	ActionsCty map[string]cty.Type
 
 	// Functions maps from local function name (not including an namespace
 	// prefix) to the declaration of a function.
@@ -542,6 +547,15 @@ type ValidateListResourceConfigRequest struct {
 	Config cty.Value
 }
 
+type ValidateActionConfigRequest struct {
+	// TypeName is the name of the action type to validate.
+	TypeName string
+
+	// Config is the configuration value to validate, which may contain unknown
+	// values.
+	Config cty.Value
+}
+
 type UpgradeResourceIdentityRequest struct {
 	// TypeName is the name of the resource type being upgraded
 	TypeName string
@@ -686,4 +700,54 @@ type ListResourceRequest struct {
 	// IncludeResourceObject can be set to true when a provider should include
 	// the full resource object for each result
 	IncludeResourceObject bool
+
+	// Limit is the maximum number of results to return
+	Limit int64
 }
+
+type ListResourceResponse struct {
+	Result cty.Value
+}
+
+type PlanActionRequest struct {
+	ActionType         string
+	ProposedActionData cty.Value
+
+	ClientCapabilities ClientCapabilities
+}
+
+type PlanActionResponse struct {
+	Deferred *Deferred
+}
+
+type InvokeActionRequest struct {
+	ActionType         string
+	PlannedActionData  cty.Value
+	ClientCapabilities ClientCapabilities
+}
+
+type InvokeActionResponse struct {
+	Events iter.Seq[InvokeActionEvent]
+}
+
+type InvokeActionEvent interface {
+	isInvokeActionEvent()
+}
+
+// Completed Event
+var _ InvokeActionEvent = &InvokeActionEvent_Completed{}
+
+type InvokeActionEvent_Completed struct {
+	Diagnostics Diagnostics
+}
+
+func (e InvokeActionEvent_Completed) isInvokeActionEvent() {}
+
+// Progress Event
+var _ InvokeActionEvent = &InvokeActionEvent_Progress{}
+
+type InvokeActionEvent_Progress struct {
+	Message string
+}
+
+func (e InvokeActionEvent_Progress) isInvokeActionEvent() {}

@@ -34,15 +34,10 @@ func ReadDataSource_Request(in *tfprotov6.ReadDataSourceRequest) *tfplugin6.Read
 	}
 
 	req := &tfplugin6.ReadDataSource_Request{
-		TypeName:     in.TypeName,
-		Config:       DynamicValue(in.Config),
-		ProviderMeta: DynamicValue(in.ProviderMeta),
-	}
-
-	if in.ClientCapabilities != nil {
-		req.ClientCapabilities = &tfplugin6.ClientCapabilities{
-			DeferralAllowed: in.ClientCapabilities.DeferralAllowed,
-		}
+		TypeName:           in.TypeName,
+		Config:             DynamicValue(in.Config),
+		ProviderMeta:       DynamicValue(in.ProviderMeta),
+		ClientCapabilities: ReadDataSourceClientCapabilities(in.ClientCapabilities),
 	}
 
 	return req

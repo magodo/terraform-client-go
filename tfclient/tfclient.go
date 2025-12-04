@@ -11,8 +11,6 @@ import (
 
 	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/go-plugin"
-	"github.com/hashicorp/terraform-plugin-go/tfprotov5"
-	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/magodo/terraform-client-go/tfclient/tfprotov5/tf5client"
 	"github.com/magodo/terraform-client-go/tfclient/tfprotov6/tf6client"
 	"github.com/magodo/terraform-client-go/tfclient/typ"
@@ -188,11 +186,11 @@ func newRaw(opts Option) (*RawClient, int, error) {
 	protoVer := pclient.NegotiatedVersion()
 	switch protoVer {
 	case 5:
-		p := raw.(tfprotov5.ProviderServer)
+		p := raw.(tf5client.TFProtoV5Client)
 		client.v5client = p
 		return &client, 5, nil
 	case 6:
-		p := raw.(tfprotov6.ProviderServer)
+		p := raw.(tf6client.TFProtoV6Client)
 		client.v6client = p
 		return &client, 6, nil
 	default:

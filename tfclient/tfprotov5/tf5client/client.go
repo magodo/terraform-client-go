@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"sync"
 
 	"github.com/hashicorp/go-plugin"
@@ -22,6 +23,12 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+type TFProtoV5Client interface {
+	tfprotov5.ProviderServer
+	tfprotov5.ListResourceServer
+	tfprotov5.ActionServer
+}
+
 // Client handles the client, or core side of the plugin rpc connection.
 // The Client methods are mostly a translation layer between the
 // terraform providers types and the grpc proto types, directly converting
@@ -32,7 +39,7 @@ type Client struct {
 	pluginClient *plugin.Client
 
 	// Proto client use to make the grpc service calls.
-	client tfprotov5.ProviderServer
+	client TFProtoV5Client
 
 	// schema stores the schema for this provider. This is used to properly
 	// serialize the state for requests.
@@ -42,7 +49,7 @@ type Client struct {
 	configuredMu sync.Mutex
 }
 
-func New(pluginClient *plugin.Client, grpcClient tfprotov5.ProviderServer, schema *typ.GetProviderSchemaResponse) (*Client, error) {
+func New(pluginClient *plugin.Client, grpcClient TFProtoV5Client, schema *typ.GetProviderSchemaResponse) (*Client, error) {
 	ctx := context.Background()
 	c := &Client{
 		pluginClient: pluginClient,
@@ -72,9 +79,8 @@ func New(pluginClient *plugin.Client, grpcClient tfprotov5.ProviderServer, schem
 		EphemeralResourceTypesCty: map[string]cty.Type{},
 		ListResourceTypes:         map[string]tfjson.Schema{},
 		ListResourceTypesCty:      map[string]cty.Type{},
-		ServerCapabilities: typ.ServerCapabilities{
-			PlanDestroy: false,
-		},
+		Actions:                   map[string]tfjson.Schema{},
+		ActionsCty:                map[string]cty.Type{},
 	}
 
 	identResp, err := grpcClient.GetResourceIdentitySchemas(ctx, new(tfprotov5.GetResourceIdentitySchemasRequest))
@@ -123,17 +129,22 @@ func New(pluginClient *plugin.Client, grpcClient tfprotov5.ProviderServer, schem
 		schemas.EphemeralResourceTypes[name] = ephemSchema
 		schemas.EphemeralResourceTypesCty[name] = configschema.SchemaBlockImpliedType(ephemSchema.Block)
 	}
-	// TODO: Add this once terraform-plugin-go supports ListResourceSchema
-	// for name, list := range resp.ListResourceSchemas {
-	// 	listSchema := convert.ProtoToProviderSchema(list, nil)
-	// 	schemas.ListResourceTypes[name] = listSchema
-	// 	schemas.ListResourceTypesCty[name] = configschema.SchemaBlockImpliedType(listSchema.Block)
-	// }
 	for name, fun := range resp.Functions {
 		schemas.Functions[name], err = convert.FunctionDeclFromProto(fun)
 		if err != nil {
 			return nil, err
 		}
+	}
+	for name, list := range resp.ListResourceSchemas {
+		listSchema := convert.ProtoToProviderSchema(list, nil)
+		schemas.ListResourceTypes[name] = listSchema
+		schemas.ListResourceTypesCty[name] = configschema.SchemaBlockImpliedType(listSchema.Block)
+	}
+
+	for name, action := range resp.ActionSchemas {
+		actionSchema := convert.ProtoToProviderSchema(action.Schema, nil)
+		schemas.Actions[name] = actionSchema
+		schemas.ActionsCty[name] = configschema.SchemaBlockImpliedType(actionSchema.Block)
 	}
 
 	c.schemas = schemas
@@ -1182,8 +1193,284 @@ func (c *Client) CloseEphemeralResource(ctx context.Context, request typ.CloseEp
 }
 
 func (c *Client) ValidateListResourceConfig(ctx context.Context, req typ.ValidateListResourceConfigRequest) typ.Diagnostics {
-	// TODO: terraform-plugin-go doesn't support ValidateListResourceConfig yet.
-	panic("unimplemented")
+	var diags typ.Diagnostics
+
+	schema := c.schemas
+	lsch, ok := schema.ListResourceTypes[req.TypeName]
+	if !ok {
+		return typ.ErrorDiagnostics(fmt.Sprintf(`unknown list resource type "%s"`, req.TypeName), nil)
+	}
+	if !req.Config.Type().HasAttribute("config") {
+		return typ.ErrorDiagnostics(`missing required attribute "config"`, nil)
+	}
+
+	configSchema := lsch.Block.NestedBlocks["config"]
+	config := req.Config.GetAttr("config")
+	mp, err := msgpack.Marshal(config, configschema.SchemaBlockImpliedType(configSchema.Block))
+	if err != nil {
+		return typ.ErrorDiagnostics("msgpack marshal", err)
+	}
+
+	protoReq := &tfprotov5.ValidateListResourceConfigRequest{
+		TypeName: req.TypeName,
+		Config:   &tfprotov5.DynamicValue{MsgPack: mp},
+	}
+	protoResp, err := c.client.ValidateListResourceConfig(ctx, protoReq)
+	if err != nil {
+		diags = append(diags, typ.RPCErrorDiagnostics(err)...)
+		return diags
+	}
+
+	respDiags := convert.DecodeDiagnostics(protoResp.Diagnostics)
+	diags = append(diags, respDiags...)
+	if diags.HasErrors() {
+		return diags
+	}
+
+	return diags
+}
+
+func (c *Client) ListResource(ctx context.Context, req typ.ListResourceRequest) (resp typ.ListResourceResponse, diags typ.Diagnostics) {
+	schema := c.schemas
+
+	listSchema, ok := schema.ListResourceTypes[req.TypeName]
+	if !ok {
+		diags = append(diags, typ.ErrorDiagnostics(fmt.Sprintf(`unknown list resource type "%s"`, req.TypeName), nil)...)
+		return
+	}
+
+	resourceSchema, ok := schema.ResourceTypes[req.TypeName]
+	if !ok || resourceSchema.Identity == nil {
+		diags = append(diags, typ.ErrorDiagnostics(fmt.Sprintf(`identitiy schema not found for resource type "%s"`, req.TypeName), nil)...)
+		return
+	}
+	resourceSchemaCty := schema.ResourceTypesCty[req.TypeName]
+
+	if !req.Config.Type().HasAttribute("config") {
+		diags = append(diags, typ.ErrorDiagnostics(`missing required attribute "config"`, nil)...)
+		return
+	}
+
+	config := req.Config.GetAttr("config")
+	mp, err := msgpack.Marshal(config, configschema.SchemaBlockImpliedType(listSchema.Block))
+	if err != nil {
+		diags = append(diags, typ.ErrorDiagnostics("msgpack marshal", err)...)
+	}
+
+	protoReq := &tfprotov5.ListResourceRequest{
+		TypeName:        req.TypeName,
+		Config:          &tfprotov5.DynamicValue{MsgPack: mp},
+		IncludeResource: req.IncludeResourceObject,
+		Limit:           req.Limit,
+	}
+
+	// Start the streaming RPC with a context. The context will be cancelled
+	// when this function returns, which will stop the stream if it is still
+	// running.
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	stream, err := c.client.ListResource(ctx, protoReq)
+	if err != nil {
+		diags = append(diags, typ.RPCErrorDiagnostics(err)...)
+		return
+	}
+
+	resp.Result = cty.DynamicVal
+	values := make([]cty.Value, 0)
+
+	// Process the stream
+	for event := range stream.Results {
+		if int64(len(values)) >= req.Limit {
+			// If we have reached the limit, we stop receiving events
+			break
+		}
+
+		if slices.ContainsFunc(event.Diagnostics, func(diag *tfprotov5.Diagnostic) bool {
+			return diag != nil && diag.Severity == tfprotov5.DiagnosticSeverityError
+		}) {
+			// If we have errors, we stop processing and return early
+			break
+		}
+
+		if slices.ContainsFunc(event.Diagnostics, func(diag *tfprotov5.Diagnostic) bool {
+			return diag != nil && diag.Severity == tfprotov5.DiagnosticSeverityWarning
+		}) && event.Identity.IdentityData == nil {
+			// If we have warnings but no identity data, we continue with the next event
+			break
+		}
+
+		obj := map[string]cty.Value{
+			"display_name": cty.StringVal(event.DisplayName),
+			"state":        cty.NullVal(resourceSchemaCty),
+			"identity":     cty.NullVal(configschema.SchemaNestedAttributeTypeImpliedType(resourceSchema.Identity)),
+		}
+
+		// Handle identity data - it must be present
+		if event.Identity == nil || event.Identity.IdentityData == nil {
+			diags = append(diags, typ.ErrorDiagnostics(fmt.Sprintf("missing identity data in ListResource event for %s", req.TypeName), nil)...)
+		} else {
+			identityVal, err := decodeDynamicValue(event.Identity.IdentityData, configschema.SchemaNestedAttributeTypeImpliedType(resourceSchema.Identity))
+			if err != nil {
+				diags = append(diags, typ.ErrorDiagnostics(err.Error(), nil)...)
+			} else {
+				obj["identity"] = identityVal
+			}
+		}
+
+		// Handle resource object if present and requested
+		if event.Resource != nil && req.IncludeResourceObject {
+			// Use the ResourceTypes schema for the resource object
+			resourceObj, err := decodeDynamicValue(event.Resource, resourceSchemaCty)
+			if err != nil {
+				diags = append(diags, typ.ErrorDiagnostics(err.Error(), nil)...)
+			} else {
+				obj["state"] = resourceObj
+			}
+		}
+
+		if diags.HasErrors() {
+			// If validation errors occurred, we stop processing and return early
+			break
+		}
+
+		values = append(values, cty.ObjectVal(obj))
+	}
+
+	// The provider result of a list resource is always a list, but
+	// we will wrap that list in an object with a single attribute "data",
+	// so that we can differentiate between a list resource instance (list.aws_instance.test[index])
+	// and the elements of the result of a list resource instance (list.aws_instance.test.data[index])
+	resp.Result = cty.ObjectVal(map[string]cty.Value{
+		"data":   cty.TupleVal(values),
+		"config": config,
+	})
+	return resp, diags
+}
+
+func (c *Client) ValidateActionConfig(ctx context.Context, req typ.ValidateActionConfigRequest) (diags typ.Diagnostics) {
+	schema := c.schemas
+
+	actionSchema, ok := schema.ActionsCty[req.TypeName]
+	if !ok {
+		diags = append(diags, typ.ErrorDiagnostics(fmt.Sprintf(`unknown action type "%s"`, req.TypeName), nil)...)
+		return
+	}
+
+	mp, err := msgpack.Marshal(req.Config, actionSchema)
+	if err != nil {
+		diags = append(diags, typ.ErrorDiagnostics("msgpack marshal", err)...)
+		return
+	}
+
+	protoReq := &tfprotov5.ValidateActionConfigRequest{
+		ActionType: req.TypeName,
+		Config:     &tfprotov5.DynamicValue{MsgPack: mp},
+	}
+
+	protoResp, err := c.client.ValidateActionConfig(ctx, protoReq)
+	if err != nil {
+		diags = append(diags, typ.RPCErrorDiagnostics(err)...)
+		return
+	}
+
+	respDiags := convert.DecodeDiagnostics(protoResp.Diagnostics)
+	diags = append(diags, respDiags...)
+	if diags.HasErrors() {
+		return diags
+	}
+
+	return diags
+}
+
+func (c *Client) PlanAction(ctx context.Context, req typ.PlanActionRequest) (resp typ.PlanActionResponse, diags typ.Diagnostics) {
+	schema := c.schemas
+
+	actionSchema, ok := schema.ActionsCty[req.ActionType]
+	if !ok {
+		diags = append(diags, typ.ErrorDiagnostics(fmt.Sprintf(`unknown action type "%s"`, req.ActionType), nil)...)
+		return
+	}
+
+	mp, err := msgpack.Marshal(req.ProposedActionData, actionSchema)
+	if err != nil {
+		diags = append(diags, typ.ErrorDiagnostics("msgpack marshal", err)...)
+		return
+	}
+
+	protoReq := &tfprotov5.PlanActionRequest{
+		ActionType: req.ActionType,
+		Config:     &tfprotov5.DynamicValue{MsgPack: mp},
+		ClientCapabilities: &tfprotov5.PlanActionClientCapabilities{
+			DeferralAllowed: req.ClientCapabilities.DeferralAllowed,
+		},
+	}
+
+	protoResp, err := c.client.PlanAction(ctx, protoReq)
+	if err != nil {
+		diags = append(diags, typ.RPCErrorDiagnostics(err)...)
+		return
+	}
+
+	respDiags := convert.DecodeDiagnostics(protoResp.Diagnostics)
+	diags = append(diags, respDiags...)
+	if diags.HasErrors() {
+		return
+	}
+
+	if def := protoResp.Deferred; def != nil {
+		resp.Deferred = &typ.Deferred{
+			Reason: typ.DeferredReason(def.Reason.String()),
+		}
+	}
+
+	return
+}
+
+func (c *Client) InvokeAction(ctx context.Context, req typ.InvokeActionRequest) (resp typ.InvokeActionResponse, diags typ.Diagnostics) {
+	schema := c.schemas
+
+	actionSchema, ok := schema.ActionsCty[req.ActionType]
+	if !ok {
+		diags = append(diags, typ.ErrorDiagnostics(fmt.Sprintf(`unknown action type "%s"`, req.ActionType), nil)...)
+		return
+	}
+
+	mp, err := msgpack.Marshal(req.PlannedActionData, actionSchema)
+	if err != nil {
+		diags = append(diags, typ.ErrorDiagnostics("msgpack marshal", err)...)
+		return
+	}
+
+	protoReq := &tfprotov5.InvokeActionRequest{
+		ActionType:         req.ActionType,
+		Config:             &tfprotov5.DynamicValue{MsgPack: mp},
+		ClientCapabilities: &tfprotov5.InvokeActionClientCapabilities{},
+	}
+
+	stream, err := c.client.InvokeAction(ctx, protoReq)
+	if err != nil {
+		diags = append(diags, typ.RPCErrorDiagnostics(err)...)
+		return
+	}
+
+	resp.Events = func(yield func(typ.InvokeActionEvent) bool) {
+		for evt := range stream.Events {
+			switch ev := evt.Type.(type) {
+			case *tfprotov5.ProgressInvokeActionEventType:
+				yield(typ.InvokeActionEvent_Progress{
+					Message: ev.Message,
+				})
+			case *tfprotov5.CompletedInvokeActionEventType:
+				yield(typ.InvokeActionEvent_Completed{
+					Diagnostics: convert.DecodeDiagnostics(ev.Diagnostics),
+				})
+			default:
+				panic(fmt.Sprintf("unexpected event type %T in InvokeAction response", evt.Type))
+			}
+		}
+	}
+
+	return
 }
 
 func (c *Client) Close() {
