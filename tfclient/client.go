@@ -114,10 +114,10 @@ type Client interface {
 	ListResource(context.Context, typ.ListResourceRequest) (typ.ListResourceResponse, typ.Diagnostics)
 
 	// PlanAction takes the proposed action config and returns the plan
-	PlanAction(context.Context, typ.PlanActionRequest) (typ.Diagnostics, typ.PlanActionResponse)
+	PlanAction(context.Context, typ.PlanActionRequest) (typ.PlanActionResponse, typ.Diagnostics)
 
 	// InvokeAction invokes an action
-	InvokeAction(context.Context, typ.InvokeActionRequest) (typ.Diagnostics, typ.InvokeActionResponse)
+	InvokeAction(context.Context, typ.InvokeActionRequest) (typ.InvokeActionResponse, typ.Diagnostics)
 
 	// Close shuts down the plugin process if applicable.
 	Close()

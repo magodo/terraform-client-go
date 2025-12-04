@@ -1393,7 +1393,7 @@ func (c *Client) ValidateActionConfig(ctx context.Context, req typ.ValidateActio
 	return diags
 }
 
-func (c *Client) PlanAction(ctx context.Context, req typ.PlanActionRequest) (diags typ.Diagnostics, resp typ.PlanActionResponse) {
+func (c *Client) PlanAction(ctx context.Context, req typ.PlanActionRequest) (resp typ.PlanActionResponse, diags typ.Diagnostics) {
 	schema := c.schemas
 
 	actionSchema, ok := schema.ActionsCty[req.ActionType]
@@ -1437,7 +1437,7 @@ func (c *Client) PlanAction(ctx context.Context, req typ.PlanActionRequest) (dia
 	return
 }
 
-func (c *Client) InvokeAction(ctx context.Context, req typ.InvokeActionRequest) (diags typ.Diagnostics, resp typ.InvokeActionResponse) {
+func (c *Client) InvokeAction(ctx context.Context, req typ.InvokeActionRequest) (resp typ.InvokeActionResponse, diags typ.Diagnostics) {
 	schema := c.schemas
 
 	actionSchema, ok := schema.ActionsCty[req.ActionType]
