@@ -387,7 +387,7 @@ func (c *GRPCClient) InvokeAction(ctx context.Context, req *tfprotov5.InvokeActi
 				evt = &tfprotov5.InvokeActionEvent{
 					Type: tfprotov5.CompletedInvokeActionEventType{
 						Diagnostics: []*tfprotov5.Diagnostic{
-							&tfprotov5.Diagnostic{
+							{
 								Severity: tfprotov5.DiagnosticSeverityError,
 								Summary:  "rpc error",
 								Detail:   err.Error(),

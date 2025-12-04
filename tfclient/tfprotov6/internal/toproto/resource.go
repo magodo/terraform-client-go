@@ -65,17 +65,12 @@ func ReadResource_Request(in *tfprotov6.ReadResourceRequest) *tfplugin6.ReadReso
 	}
 
 	req := &tfplugin6.ReadResource_Request{
-		TypeName:        in.TypeName,
-		Private:         in.Private,
-		CurrentState:    DynamicValue(in.CurrentState),
-		ProviderMeta:    DynamicValue(in.ProviderMeta),
-		CurrentIdentity: ResourceIdentityData(in.CurrentIdentity),
-	}
-
-	if in.ClientCapabilities != nil {
-		req.ClientCapabilities = &tfplugin6.ClientCapabilities{
-			DeferralAllowed: in.ClientCapabilities.DeferralAllowed,
-		}
+		TypeName:           in.TypeName,
+		Private:            in.Private,
+		CurrentState:       DynamicValue(in.CurrentState),
+		ProviderMeta:       DynamicValue(in.ProviderMeta),
+		CurrentIdentity:    ResourceIdentityData(in.CurrentIdentity),
+		ClientCapabilities: ReadResourceClientCapabilities(in.ClientCapabilities),
 	}
 
 	return req
@@ -87,19 +82,14 @@ func PlanResourceChange_Request(in *tfprotov6.PlanResourceChangeRequest) *tfplug
 	}
 
 	req := &tfplugin6.PlanResourceChange_Request{
-		TypeName:         in.TypeName,
-		PriorState:       DynamicValue(in.PriorState),
-		ProposedNewState: DynamicValue(in.ProposedNewState),
-		Config:           DynamicValue(in.Config),
-		PriorPrivate:     in.PriorPrivate,
-		ProviderMeta:     DynamicValue(in.ProviderMeta),
-		PriorIdentity:    ResourceIdentityData(in.PriorIdentity),
-	}
-
-	if in.ClientCapabilities != nil {
-		req.ClientCapabilities = &tfplugin6.ClientCapabilities{
-			DeferralAllowed: in.ClientCapabilities.DeferralAllowed,
-		}
+		TypeName:           in.TypeName,
+		PriorState:         DynamicValue(in.PriorState),
+		ProposedNewState:   DynamicValue(in.ProposedNewState),
+		Config:             DynamicValue(in.Config),
+		PriorPrivate:       in.PriorPrivate,
+		ProviderMeta:       DynamicValue(in.ProviderMeta),
+		PriorIdentity:      ResourceIdentityData(in.PriorIdentity),
+		ClientCapabilities: PlanResourceChangeClientCapabilities(in.ClientCapabilities),
 	}
 
 	return req
@@ -129,14 +119,9 @@ func ImportResourceState_Request(in *tfprotov6.ImportResourceStateRequest) *tfpl
 	}
 
 	req := &tfplugin6.ImportResourceState_Request{
-		TypeName: in.TypeName,
-		Id:       in.ID,
-	}
-
-	if in.ClientCapabilities != nil {
-		req.ClientCapabilities = &tfplugin6.ClientCapabilities{
-			DeferralAllowed: in.ClientCapabilities.DeferralAllowed,
-		}
+		TypeName:           in.TypeName,
+		Id:                 in.ID,
+		ClientCapabilities: ImportResourceStateClientCapabilities(in.ClientCapabilities),
 	}
 
 	return req
