@@ -4,6 +4,7 @@ package typ
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -45,7 +46,7 @@ func (diags Diagnostics) Err() error {
 	case len(diags) == 1:
 		diag := diags[0]
 		if diag.Detail == "" {
-			return fmt.Errorf(diag.Summary)
+			return errors.New(diag.Summary)
 		}
 		return fmt.Errorf("%s: %s", diag.Summary, diag.Detail)
 	default:
@@ -58,7 +59,7 @@ func (diags Diagnostics) Err() error {
 				fmt.Fprintf(&ret, "\n- %s: %s", diag.Summary, diag.Detail)
 			}
 		}
-		return fmt.Errorf(ret.String())
+		return errors.New(ret.String())
 	}
 }
 
